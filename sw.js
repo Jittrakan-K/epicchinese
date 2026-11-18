@@ -1,9 +1,9 @@
 /* แคชไฟล์ของเว็บไว้ใช้ตอนออฟไลน์ เปลี่ยน VERSION ทุกครั้งที่อัปเดตไฟล์หลัก */
-const VERSION = 'epic-v8';
+const VERSION = 'epic-v9';
 const SHELL = ['./', 'index.html', 'css/style.css', 'css/tokens.css', 'css/base.css', 'js/app.js', 'js/cloud.js', 'js/firebase-config.js', 'js/icons.js', 'js/data-words.js', 'js/data-content.js', 'vendor/hanzi-writer.min.js', 'assets/logo.svg', 'assets/logo-192.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -20,7 +20,8 @@ self.addEventListener('fetch', e => {
     const hit = await cache.match(req);
     if (stable && hit) return hit;
     try {
-      const res = await fetch(req);
+      // ไฟล์ของเว็บเองให้ถามเซิร์ฟเวอร์ทุกครั้ง ไม่ใช้แคช HTTP เก่า เพื่อให้อัปเดตถึงผู้ใช้ทันที
+      const res = await fetch(same && !stable ? new Request(req, { cache: 'no-cache' }) : req);
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;
     } catch (err) {
