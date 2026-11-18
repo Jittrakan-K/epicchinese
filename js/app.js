@@ -262,7 +262,7 @@
     const path = location.hash.replace(/^#/, '') || '/';
     for (const [re, fn] of ROUTES) {
       const m = path.match(re);
-      if (m) { app.innerHTML = ''; renderChrome(path); fn(m); window.scrollTo(0, 0); return; }
+      if (m) { app.innerHTML = ''; $('#after').innerHTML = ''; renderChrome(path); fn(m); window.scrollTo(0, 0); return; }
     }
     location.hash = '#/';
   }
@@ -285,9 +285,6 @@
     return cl === i ? 'cur' : 'todo';
   }
   function heroSVG() {
-    const narrow = matchMedia('(max-width: 760px)').matches;
-    const vb = narrow ? '430 56 640 400' : '0 0 1200 460';
-    const par = narrow ? 'xMidYMid meet' : 'xMaxYMax slice';
     const pts = TRAIL.map(([x, y]) => ({ x, y }));
     const sg = segs(pts);
     const states = pts.map((_, i) => stationState(i));
@@ -298,37 +295,30 @@
     const marks = pts.map((p, i) => {
       const s = states[i];
       const m = s === 'done'
-        ? `<rect x="${p.x - 8}" y="${p.y - 8}" width="16" height="16" rx="3" transform="rotate(-6 ${p.x} ${p.y})" style="fill:var(--accent)"/>`
+        ? `<rect x="${p.x - 11}" y="${p.y - 11}" width="22" height="22" rx="4" transform="rotate(${i % 2 ? 6 : -6} ${p.x} ${p.y})" style="fill:var(--color-accent);stroke:var(--color-white)" stroke-width="3"/>`
         : s === 'cur'
-          ? `<circle class="st-ring" cx="${p.x}" cy="${p.y}" r="14" fill="none" style="stroke:var(--accent)" stroke-width="2"/><circle cx="${p.x}" cy="${p.y}" r="8" fill="currentColor"/>`
-          : `<circle class="st-ring" cx="${p.x}" cy="${p.y}" r="7" style="fill:var(--card)" stroke="currentColor" stroke-width="1.5"/>`;
-      const flag = i === 6 ? `<path d="M${p.x} ${p.y - 10} V${p.y - 42}" stroke="currentColor" stroke-width="1.5"/><path d="M${p.x} ${p.y - 42} L${p.x + 22} ${p.y - 36} L${p.x} ${p.y - 30} Z" style="fill:${s === 'done' ? 'var(--accent)' : 'none'}" stroke="${s === 'done' ? 'none' : 'currentColor'}" stroke-width="1.2"/>` : '';
-      return `<g class="st-hit" data-go="#/level/${i}" role="link" tabindex="0" aria-label="${names[i]}"><circle cx="${p.x}" cy="${p.y}" r="22" fill="transparent"/>${flag}${m}<text class="st-label ${s === 'cur' ? 'on' : ''}" x="${p.x + 20}" y="${p.y + (narrow ? 6 : 4)}" style="${narrow ? 'font-size:17px' : ''}">${names[i]}</text></g>`;
+          ? `<circle class="st-ring" cx="${p.x}" cy="${p.y}" r="17" style="fill:var(--color-white);stroke:var(--color-accent)" stroke-width="3"/><circle cx="${p.x}" cy="${p.y}" r="10" style="fill:var(--color-ink)"/>`
+          : `<circle class="st-ring" cx="${p.x}" cy="${p.y}" r="9" style="fill:var(--color-paper-3);stroke:var(--color-ink)" stroke-width="2.5"/>`;
+      const flag = i === 6 ? `<path d="M${p.x} ${p.y - 12} V${p.y - 46}" style="stroke:var(--color-ink)" stroke-width="2.5"/><path d="M${p.x} ${p.y - 46} L${p.x + 26} ${p.y - 39} L${p.x} ${p.y - 32} Z" style="fill:${s === 'done' ? 'var(--color-accent)' : 'var(--color-paper-3)'};stroke:var(--color-ink)" stroke-width="2"/>` : '';
+      return `<g class="st-hit" data-go="#/level/${i}" role="link" tabindex="0" aria-label="${names[i]}"><circle cx="${p.x}" cy="${p.y}" r="24" fill="transparent"/>${flag}${m}<text class="st-label" x="${p.x + 22}" y="${p.y + 6}">${names[i]}</text></g>`;
     }).join('');
-    const pine = (x, y, s = 1) => `<path d="M${x} ${y} l${-7 * s} 0 l${7 * s} ${-13 * s} l${7 * s} ${13 * s} z M${x} ${y - 7 * s} l${-5 * s} 0 l${5 * s} ${-10 * s} l${5 * s} ${10 * s} z" fill="currentColor" opacity=".42"/><path d="M${x} ${y} v${4 * s}" stroke="currentColor" opacity=".42"/>`;
-    return `<svg class="land" viewBox="${vb}" preserveAspectRatio="${par}" role="img" aria-label="แผนที่เส้นทางจากฐานถึงยอดเขา HSK 6">
-      <defs>
-        <linearGradient id="gFar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".1"/><stop offset="1" stop-color="currentColor" stop-opacity=".015"/></linearGradient>
-        <linearGradient id="gMid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".2"/><stop offset="1" stop-color="currentColor" stop-opacity=".03"/></linearGradient>
-        <linearGradient id="gMain" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".32"/><stop offset=".7" stop-color="currentColor" stop-opacity=".07"/><stop offset="1" stop-color="currentColor" stop-opacity=".04"/></linearGradient>
-        <radialGradient id="gMist"><stop offset="0" style="stop-color:var(--card);stop-opacity:var(--mist)"/><stop offset="1" style="stop-color:var(--card)" stop-opacity="0"/></radialGradient>
-      </defs>
-      <circle cx="1018" cy="116" r="42" style="fill:var(--accent)" opacity=".9"/>
-      <path d="M958 178 q6 -6 12 0 q6 -6 12 0 M1000 200 q4 -4 8 0 q4 -4 8 0" stroke="currentColor" stroke-width="1.3" fill="none" opacity=".45" stroke-linecap="round"/>
-      <path d="M300 460 L300 336 C360 322 400 292 450 298 C500 304 530 272 580 264 C640 254 660 216 720 208 C780 200 800 232 850 224 C900 216 960 170 1030 178 C1090 184 1130 216 1200 222 L1200 460 Z" fill="url(#gFar)"/>
-      <path d="M640 460 C720 400 780 362 840 332 C900 302 960 232 1010 216 C1050 204 1080 192 1110 208 C1150 228 1170 252 1200 264 L1200 460 Z" fill="url(#gMid)"/>
-      <path d="M520 460 C600 432 660 392 710 342 C760 292 800 222 840 162 C860 130 876 102 890 94 C904 88 916 98 928 116 C960 162 990 222 1030 272 C1070 322 1120 352 1200 374 L1200 460 Z" fill="url(#gMain)"/>
-      <g stroke="currentColor" fill="none" stroke-linecap="round" opacity=".22" stroke-width="1.2">
-        <path d="M908 112 C926 158 938 196 952 238"/><path d="M920 130 C948 176 970 214 994 252"/>
-        <path d="M1082 196 C1094 214 1114 232 1140 246"/>
+    const pine = (x, y, s = 1) => `<path d="M${x} ${y} l${-8 * s} 0 l${8 * s} ${-15 * s} l${8 * s} ${15 * s} z M${x} ${y - 8 * s} l${-6 * s} 0 l${6 * s} ${-11 * s} l${6 * s} ${11 * s} z" style="fill:var(--color-ink)" opacity=".55"/>`;
+    return `<svg class="map" viewBox="410 40 790 420" role="img" aria-label="แผนที่ความคืบหน้า จากฐานถึงยอดเขา HSK 6">
+      <rect x="410" y="40" width="790" height="420" style="fill:var(--color-paper-3)"/>
+      <circle cx="1048" cy="118" r="44" style="fill:var(--color-accent);stroke:var(--color-white)" stroke-width="7"/>
+      <path d="M960 196 q7 -7 14 0 q7 -7 14 0 M1004 218 q5 -5 10 0 q5 -5 10 0" style="stroke:var(--color-ink)" stroke-width="2" fill="none" stroke-linecap="round" opacity=".6"/>
+      <path d="M410 460 L410 320 C460 300 500 290 580 264 C640 254 660 216 720 208 C780 200 800 232 850 224 C900 216 960 170 1030 178 C1090 184 1130 216 1200 222 L1200 460 Z" style="fill:var(--color-wash-2)"/>
+      <path d="M640 460 C720 400 780 362 840 332 C900 302 960 232 1010 216 C1050 204 1080 192 1110 208 C1150 228 1170 252 1200 264 L1200 460 Z" style="fill:var(--color-accent-2)"/>
+      <path d="M520 460 C600 432 660 392 710 342 C760 292 800 222 840 162 C860 130 876 102 890 94 C904 88 916 98 928 116 C960 162 990 222 1030 272 C1070 322 1120 352 1200 374 L1200 460 Z" style="fill:var(--color-wash)"/>
+      <path d="M890 94 C904 88 916 98 928 116 C940 134 952 150 960 168 C944 160 930 168 916 156 C904 166 890 156 878 166 C868 160 858 168 850 160 C862 136 876 104 890 94 Z" style="fill:var(--color-paper-3)" opacity=".9"/>
+      <g style="stroke:var(--color-ink)" fill="none" stroke-linecap="round" opacity=".28" stroke-width="2">
+        <path d="M914 178 C930 214 940 240 956 276"/><path d="M936 196 C960 232 980 260 1006 296"/><path d="M1082 196 C1094 214 1114 232 1140 246"/><path d="M700 340 C690 360 676 376 660 392"/>
       </g>
-      <ellipse cx="760" cy="300" rx="250" ry="26" fill="url(#gMist)"/>
-      <ellipse cx="1070" cy="318" rx="190" ry="22" fill="url(#gMist)"/>
-      <path d="M0 460 L0 434 C140 422 260 428 380 416 C480 406 560 422 650 406 C740 392 800 412 900 400 C1000 390 1080 406 1200 394 L1200 460 Z" fill="currentColor" opacity=".08"/>
-      <path d="M930 460 C990 432 1050 420 1110 412 C1150 406 1180 402 1200 400 L1200 460 Z" fill="currentColor" opacity=".14"/>
-      ${pine(1000, 404)}${pine(1018, 400, 0.85)}${pine(1140, 398, 1.1)}${pine(1160, 402, 0.8)}${pine(400, 424, 0.8)}
-      ${solid ? `<path d="${solid}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity=".75"/>` : ''}
-      ${dashed ? `<path d="${dashed}" fill="none" stroke="currentColor" stroke-width="1.6" stroke-dasharray="1 7" stroke-linecap="round" opacity=".7"/>` : ''}
+      <path d="M410 460 L410 438 C520 424 600 432 680 418 C760 404 820 420 920 408 C1020 398 1100 412 1200 402 L1200 460 Z" style="fill:var(--color-paper-2)"/>
+      <path d="M930 460 C990 434 1050 422 1110 414 C1150 408 1180 404 1200 402 L1200 460 Z" style="fill:var(--color-accent-2)"/>
+      ${pine(1000, 406)}${pine(1020, 402, 0.85)}${pine(1140, 400, 1.1)}${pine(1162, 404, 0.8)}${pine(520, 432, 0.8)}
+      ${solid ? `<path d="${solid}" fill="none" style="stroke:var(--color-ink)" stroke-width="3.5" stroke-linecap="round"/>` : ''}
+      ${dashed ? `<path d="${dashed}" fill="none" style="stroke:var(--color-ink)" stroke-width="3" stroke-dasharray="1 9" stroke-linecap="round"/>` : ''}
       ${marks}
     </svg>`;
   }
@@ -435,54 +425,101 @@
     const info = isBase ? 'เสียง พินอิน ขีด' : C.levelInfo[l].name;
     return `<a class="lv-row ${sel === l ? 'on' : ''}" href="#/level/${l}">
       <span class="lv-badge ${done ? 'done' : cl === l ? 'cur' : ''}">${isBase ? '基' : cn(l)}</span>
-      <span><b style="font-weight:500">${name}</b> <span class="muted" style="font-size:13px">${info}</span>
+      <span><b style="font-weight:700">${name}</b> <span class="muted" style="font-size:13px">${info}</span>
         <span class="bar" style="margin-top:6px;display:block"><i style="width:${pct(d, total)}%"></i></span></span>
       <span class="lv-tag" style="text-align:right">${d}/${total}</span></a>`;
   }
   const levelsCard = sel => `<div class="card pad"><h3>ทุกระดับ</h3><p class="muted" style="font-size:13px">${fmt(W.length)} คำ ตามหลักสูตร HSK 2.0</p>
       <div class="lv-list" style="margin:12px -12px -8px">${[0, ...LEVELS].map(l => levelRow(l, sel)).join('')}</div></div>`;
 
-  function primaryCTA(cur) {
-    if (cur.type === 'base') {
-      const fresh = !Object.keys(S.base).length && !S.xp;
-      return `<a class="btn red lg" href="#/base/${cur.key}">${fresh ? 'เริ่มจากก้าวแรก' : 'เรียนต่อ'}: ${cur.b.title}${ic('arrow-right')}</a>`;
+  function levelCards() {
+    const cl = curLevel();
+    return [0, ...LEVELS].map(l => {
+      const isBase = l === 0;
+      const done = isBase ? baseDoneAll() : levelDone(l);
+      const total = isBase ? BASE.length : UNITS[l].length;
+      const d = isBase ? BASE.filter(b => S.base[b.key]).length : unitsDoneIn(l);
+      const cur = cl === l && !done;
+      return `<li><a class="lv-card ${cur ? 'cur' : ''}" href="#/level/${l}">
+        <span class="lv-badge ${done ? 'done' : cur ? 'cur' : ''}">${isBase ? '基' : cn(l)}</span>
+        <span class="nm">${isBase ? 'ฐาน' : `HSK ${l}`}</span>
+        <span class="inf">${isBase ? 'เสียง พินอิน ขีด' : esc(C.levelInfo[l].name)}</span>
+        <span class="ct">${d}/${total} ${isBase ? 'ด่าน' : 'บท'}</span>
+        <span class="bar"><i style="width:${pct(d, total)}%"></i></span></a></li>`;
+    }).join('');
+  }
+  function levelSumCard(l) {
+    if (l === 0) {
+      const d = BASE.filter(b => S.base[b.key]).length;
+      return `<div class="card pad lvsum"><span class="fig">${d}/${BASE.length}</span><p class="sec" style="margin-top:8px">ด่านพื้นฐานที่ผ่านแล้ว</p>
+        <div class="bar accent" style="margin:16px 0"><i style="width:${pct(d, BASE.length)}%"></i></div>
+        <a class="btn" style="width:100%" href="#/practice/placement">${ic('gauge')}มีพื้นฐานแล้ว วัดระดับ</a></div>`;
     }
-    if (cur.type === 'unit') return `<a class="btn red lg" href="#/unit/${cur.unit.key}">เรียนต่อ: HSK ${cur.level} บทที่ ${cur.unit.n}${ic('arrow-right')}</a>`;
-    if (cur.type === 'test') return `<a class="btn red lg" href="#/test/${cur.level}">สอบวัดระดับ HSK ${cur.level}${ic('arrow-right')}</a>`;
-    return `<a class="btn red lg" href="#/review">ทบทวนคำศัพท์${ic('arrow-right')}</a>`;
+    const d = unitsDoneIn(l), t = UNITS[l].length;
+    return `<div class="card pad lvsum"><span class="fig">${d}/${t}</span><p class="sec" style="margin-top:8px">บทที่ผ่านแล้วใน HSK ${l}</p>
+      <div class="bar accent" style="margin:16px 0"><i style="width:${pct(d, t)}%"></i></div>
+      <div class="stack" style="gap:8px"><a class="btn" href="#/grammar/${l}">${ic('scroll-text')}ไวยากรณ์ HSK ${l}</a><a class="btn" href="#/test/${l}">${ic('flag')}${levelPassed(l) ? 'สอบอีกครั้ง' : 'สอบข้ามระดับ'}</a></div></div>`;
+  }
+  function curTag(cur) {
+    if (cur.type === 'base') return `ตอนนี้อยู่ที่ฐาน`;
+    if (cur.type === 'unit') return `ตอนนี้ HSK ${cur.level} บทที่ ${cur.unit.n}`;
+    if (cur.type === 'test') return `พร้อมสอบ HSK ${cur.level}`;
+    return 'ถึงยอดเขาแล้ว';
+  }
+  function primaryCTA(cur) {
+    if (cur.type === 'base') return `<a class="btn red lg" href="#/base/${cur.key}">${Object.keys(S.base).length || S.xp ? 'เรียนด่านต่อไป' : 'เริ่มบทแรก'}</a>`;
+    if (cur.type === 'unit') return `<a class="btn red lg" href="#/unit/${cur.unit.key}">เรียนบทที่ ${cur.unit.n} ต่อ</a>`;
+    if (cur.type === 'test') return `<a class="btn red lg" href="#/test/${cur.level}">สอบ HSK ${cur.level}</a>`;
+    return `<a class="btn red lg" href="#/review">ทบทวนคำศัพท์</a>`;
   }
   function secondaryCTA() {
     const due = dueIds().length;
     if (due) return `<a class="btn lg" href="#/review">${ic('rotate-ccw')}ทบทวน ${due} คำ</a>`;
-    if (!learnedIds().length) return `<a class="btn lg" href="#/test/1">${ic('flag')}มีพื้นฐานแล้ว สอบข้ามระดับ</a>`;
+    if (!learnedIds().length) return `<a class="btn lg" href="#/practice/placement">${ic('gauge')}วัดระดับก่อน</a>`;
     return `<a class="btn lg" href="#/dict">${ic('book-open')}เปิดคลังคำ</a>`;
   }
 
   /* ---------- views: home & level ---------- */
   function viewHome() {
     const cur = current(); const lv = cur.level;
-    const title = lv === 0 ? 'ฐาน: ปูพื้นก่อนเริ่ม HSK' : `HSK ${lv} · ${C.levelInfo[lv].name}`;
+    const title = lv === 0 ? 'ฐาน ปูพื้นก่อนเริ่ม' : `HSK ${lv} ${C.levelInfo[lv].name}`;
+    const t = todayXP(), g = S.settings.goal, due = dueIds().length, learned = learnedIds().length;
+    const w = wordOfDay(); const nx = nextDueText();
     app.innerHTML = `<div class="enter">
-      <section class="hero">${heroSVG()}
-        <div class="hero-text">
-          <h1>千里之行，<br>始于足下</h1>
-          <p class="tr">การเดินทางพันลี้ เริ่มต้นจากก้าวแรก</p>
-          <p class="lead">เส้นทางเรียนภาษาจีนสำหรับคนไทย จากยังไม่รู้สักตัวไปจนถึง HSK 6 ทีละบท ฟัง อ่าน เขียน และทบทวนในที่เดียว</p>
+      <section class="stage">
+        <div>
+          <h1>เรียนจีนจากศูนย์<br>ถึง HSK 6</h1>
+          <p class="lead">บทเรียน แบบฝึก และการทบทวนสำหรับคนไทย ครบ ${fmt(W.length)} คำ</p>
           <div class="actions">${primaryCTA(cur)}${secondaryCTA()}</div>
-          <p class="meta mono">เรียนแล้ว ${fmt(learnedIds().length)} จาก ${fmt(W.length)} คำ</p>
+        </div>
+        <figure class="map-fig">
+          <span class="tag map-tag">${curTag(cur)}</span>
+          <div class="map-card">${heroSVG()}</div>
+          <figcaption><span class="han">千里之行，始于足下</span><span>การเดินทางพันลี้ เริ่มต้นจากก้าวแรก</span></figcaption>
+        </figure>
+      </section>
+      <section class="section">
+        <div class="section-head"><h2>วันนี้ของคุณ</h2></div>
+        <div class="bento">
+          <div class="fill red b-lead"><span class="fig">${fmt(learned)}</span><span class="ttl">คำที่เรียนแล้ว</span><span class="ln">จากทั้งหมด ${fmt(W.length)} คำ ตั้งแต่ HSK 1 ถึง 6</span></div>
+          <div class="fill ink b-streak"><span class="fig">${streak()}</span><span class="ttl">วันติดต่อกัน</span><span class="ln">วันนี้ได้ ${t} จากเป้า ${g} XP</span><span class="bar"><i style="width:${Math.min(100, pct(t, g))}%"></i></span></div>
+          <div class="fill grey b-due"><span class="fig">${due}</span><span class="ttl">คำรอทบทวน</span>${due ? `<a class="btn sm" href="#/review">ทบทวนตอนนี้</a>` : `<span class="ln">${nx ? `รอบถัดไป${nx}` : 'ผ่านบทแรกแล้วคำจะมารอที่นี่'}</span>`}</div>
+          <div class="fill white b-wod"><span class="han">${esc(w.h)}</span><div class="stack" style="gap:8px;min-width:0">
+            <span class="ttl">${esc(w.th)}</span><span class="ln">${esc(w.p)}, คำประจำวันของ HSK ${w.l}</span>
+            <div class="row wrap" style="gap:8px"><button class="btn sm" data-say="${esc(w.h)}">${ic('volume-2', 's16')}ฟัง</button>${starBtn(w.id, 'sm')}<button class="btn sm" data-word="${w.id}">${ic('pen-line', 's16')}ลำดับขีด</button></div></div></div>
         </div>
       </section>
       <section class="section grid-2">
         <div>
-          <div class="section-head"><div><h2>${esc(title)}</h2><p class="muted" style="font-size:14px;margin-top:4px">${lv === 0 ? 'ฝึกหูและมือให้คุ้นกับภาษาจีน ทำข้ามได้ถ้ามีพื้นฐานแล้ว' : esc(C.levelInfo[lv].blurb)}</p></div>
-            <a class="link" href="#/level/${lv}">ดูทั้งระดับ${ic('chevron-right', 's16')}</a></div>
+          <div class="section-head"><div><h2>${esc(title)}</h2><p class="lead">${lv === 0 ? 'ฝึกหูและมือให้คุ้นกับภาษาจีน ข้ามได้ถ้ามีพื้นฐานแล้ว' : esc(C.levelInfo[lv].blurb)}</p></div>
+            <a class="link" href="#/level/${lv}">ดูทั้งระดับ</a></div>
           <div class="path-wrap" id="path"></div>
         </div>
-        <aside class="stack">${wodCard()}${todayCard()}${levelsCard(lv)}</aside>
+        <aside class="stack">${levelSumCard(lv)}</aside>
       </section></div>`;
+    $('#after').innerHTML = `<section class="band"><div class="band-in"><h2>เจ็ดด่านถึงยอดเขา</h2><ol class="lv-cards">${levelCards()}</ol></div></section>`;
     bindHero(app); bindSay(app);
     mountPath($('#path'), lv, false);
-    let t; onView('resize', () => { clearTimeout(t); t = setTimeout(() => { const h = $('.hero'); if (h) { $('svg.land', h).outerHTML = heroSVG(); bindHero(h); } }, 150); });
   }
 
   function viewLevel(l) {
@@ -493,7 +530,7 @@
     app.innerHTML = `<div class="enter">
       <div class="page-head"><div>
         <div class="crumb"><a href="#/">แผนที่</a>${ic('chevron-right', 's16')}<span>${isBase ? 'ฐาน' : `HSK ${l}`}</span></div>
-        <h1>${isBase ? 'ฐาน · ปูพื้นก่อนเริ่ม' : `HSK ${l} · ${esc(C.levelInfo[l].name)}`}</h1>
+        <h1>${isBase ? 'ฐาน ปูพื้นก่อนเริ่ม' : `HSK ${l} ${esc(C.levelInfo[l].name)}`}</h1>
         <p class="lead">${isBase ? 'วรรณยุกต์ พินอิน ขีด และหมวดนำ สี่เรื่องที่ทำให้ทุกบทต่อจากนี้ง่ายขึ้น' : esc(C.levelInfo[l].blurb)}</p>
       </div></div>
       <div class="grid-2">
@@ -597,7 +634,7 @@
       if (ok) { score++; addXP(xpEach); } else { btns[k].classList.add('wrong'); if (q.word) wrong.push(q.word); }
       if (q.say && (q.sayAfter || !ok)) speak(q.say);
       const w = q.word;
-      const note = w ? `<span class="han" style="font-size:20px">${esc(w.h)}</span> <span class="sec">${esc(w.p)}</span> <span class="muted">· ${esc(short(w))}</span>` : (q.note || '');
+      const note = w ? `<span class="han" style="font-size:20px">${esc(w.h)}</span> <span class="sec">${esc(w.p)}</span> <span class="muted">${esc(short(w))}</span>` : (q.note || '');
       $('#qnote', host).innerHTML = `<span>${ok ? `<b class="ok">ถูกต้อง</b>` : `<b class="no">ยังไม่ใช่</b>`} ${note}</span>
         <button class="btn primary" id="qnext">${i + 1 < qs.length ? 'ข้อต่อไป' : 'ดูผล'} <kbd style="background:transparent;color:inherit;border-color:currentColor;opacity:.6">Enter</kbd></button>`;
       $('#qnext', host).onclick = next;
@@ -625,7 +662,7 @@
     return `<div class="card result enter">
       <div class="stamp ${passed ? '' : 'grey'}">${esc(passed ? glyph : '再')}</div>
       <div class="score">${p}%</div>
-      <p class="sec" style="margin-top:8px">${esc(title)} · ตอบถูก ${score} จาก ${total} ข้อ</p>
+      <p class="sec" style="margin-top:8px">${esc(title)}<br>ตอบถูก ${score} จาก ${total} ข้อ</p>
       <div class="row wrap" style="justify-content:center;margin-top:24px">${actions}</div>
       ${wrong.length ? `<div class="missed"><h3 style="margin-bottom:8px">คำที่ควรดูอีกรอบ</h3><div class="wlist">${[...new Map(wrong.map(w => [w.id, w])).values()].map(w => `<button class="wrow" data-say="${esc(w.h)}"><span class="han">${esc(w.h)}</span><span><div class="t">${esc(short(w))}</div><div class="p">${esc(w.p)}</div></span></button>`).join('')}</div></div>` : ''}
     </div>`;
@@ -646,8 +683,8 @@
     app.innerHTML = `<div class="enter">
       <div class="page-head"><div>
         <div class="crumb"><a href="#/">แผนที่</a>${ic('chevron-right', 's16')}<a href="#/level/${l}">HSK ${l}</a>${ic('chevron-right', 's16')}<span>บทที่ ${n}</span></div>
-        <h1>HSK ${l} · บทที่ ${n}</h1>
-        <p class="lead">${u.words.length} คำ · <span class="han" style="letter-spacing:.08em">${u.words.slice(0, 6).map(w => esc(w.h)).join(' ')}</span></p>
+        <h1>HSK ${l} บทที่ ${n}</h1>
+        <p class="lead">${u.words.length} คำในบทนี้<br><span class="han">${u.words.slice(0, 6).map(w => esc(w.h)).join(' ')}</span></p>
       </div>
       <div class="row">${st && st.done ? `<span class="done-note"><span class="seal" style="width:22px;height:22px;font-size:14px">印</span>ผ่านแล้ว ${st.best}%</span>` : ''}</div></div>
       <div class="tabs" role="tablist" style="margin-bottom:24px">
@@ -685,8 +722,8 @@
         </div>
         <div class="stroke-box" id="sb"></div>
         <div class="nav-row">
-          <button class="btn" id="prev">${ic('chevron-left')}ก่อนหน้า</button>
-          ${idx === u.words.length - 1 ? `<a class="btn primary" href="#/unit/${u.key}/quiz">ทำแบบทดสอบ${ic('arrow-right')}</a>` : `<button class="btn primary" id="next">ถัดไป${ic('chevron-right')}</button>`}
+          <button class="btn" id="prev">ก่อนหน้า</button>
+          ${idx === u.words.length - 1 ? `<a class="btn primary" href="#/unit/${u.key}/quiz">ทำแบบทดสอบ</a>` : `<button class="btn primary" id="next">ถัดไป</button>`}
         </div>`;
       $('#say', wc).onclick = () => speak(w.h);
       $('#strk', wc).onclick = () => animateWord($('#sb', wc), w.h, 96);
@@ -716,7 +753,7 @@
         </div>
         <p class="muted" id="wmsg" style="font-size:14px;text-align:center;min-height:22px">กดลองเขียน แล้วลากเส้นตามลำดับขีดในตาราง</p>
       </div>
-      <div class="card pad"><h3>เลือกตัวอักษร</h3><p class="muted" style="font-size:13px;margin:4px 0 16px">${chars.length} ตัว · จุดแดงคือตัวที่เคยเขียนถูกแล้ว</p>
+      <div class="card pad"><h3>เลือกตัวอักษร</h3><p class="muted" style="font-size:13px;margin:4px 0 16px">${chars.length} ตัว จุดแดงคือตัวที่เคยเขียนถูกแล้ว</p>
         <div class="char-pick" id="cp">${chars.map(c => `<button data-c="${esc(c)}" class="${S.written[c] ? 'ok' : ''}">${esc(c)}</button>`).join('')}</div>
         <div id="winfo" style="margin-top:20px"></div></div>
     </div>`;
@@ -768,7 +805,7 @@
       <div class="stamp grey">${cn(u.n)}</div>
       <h2 style="margin-top:24px">แบบทดสอบบทที่ ${u.n}</h2>
       <p class="sec" style="margin-top:8px">${n} ข้อ ทั้งความหมาย ตัวอักษร การฟัง และพินอิน ตอบถูก 80% ขึ้นไปเพื่อประทับตราบทนี้ แล้วคำทั้งหมดจะเข้าสู่การทบทวน</p>
-      <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มทำ${ic('arrow-right')}</button></div>
+      <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มทำ</button></div>
       <p class="muted" style="font-size:13px;margin-top:16px">ตอบด้วยปุ่ม <kbd>1</kbd> ถึง <kbd>4</kbd> และไปข้อต่อไปด้วย <kbd>Enter</kbd></p></div>`;
     $('#go', host).onclick = () => {
       const pool = W.filter(w => w.l === u.level);
@@ -786,7 +823,7 @@
           host.innerHTML = resultHTML(r, {
             passed, glyph: cn(u.n), title: passed ? `ประทับตราบทที่ ${u.n} แล้ว` : 'อีกนิดเดียว ทบทวนคำแล้วลองใหม่',
             actions: passed
-              ? `<a class="btn red lg" href="${nextHref}">${nxt ? `บทที่ ${nxt.n}` : `สอบวัดระดับ HSK ${u.level}`}${ic('arrow-right')}</a><a class="btn lg" href="#/level/${u.level}">${ic('map')}กลับแผนที่</a>`
+              ? `<a class="btn red lg" href="${nextHref}">${nxt ? `บทที่ ${nxt.n}` : `สอบวัดระดับ HSK ${u.level}`}</a><a class="btn lg" href="#/level/${u.level}">${ic('map')}กลับแผนที่</a>`
               : `<button class="btn red lg" id="again">${ic('refresh-cw')}ลองอีกครั้ง</button><a class="btn lg" href="#/unit/${u.key}/words">${ic('layers')}ดูคำศัพท์</a>`
           });
           bindSay(host);
@@ -809,7 +846,7 @@
         <h2 style="margin-top:24px">สอบวัดระดับ HSK ${l}</h2>
         <p class="sec" style="margin-top:8px">${n} ข้อ สุ่มจากคำศัพท์ทั้งหมด ${fmt(pool.length)} คำของระดับนี้ ผ่าน 80% จะประทับตราทุกบทใน HSK ${l} และเปิดทางสู่ ${l < 6 ? `HSK ${l + 1}` : 'ยอดเขา'}</p>
         ${t ? `<p class="mono muted" style="font-size:13px;margin-top:12px">คะแนนดีที่สุด ${t.best}%</p>` : ''}
-        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มสอบ${ic('arrow-right')}</button><a class="btn lg" href="#/level/${l}">ยังก่อน</a></div>
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มสอบ</button><a class="btn lg" href="#/level/${l}">ยังก่อน</a></div>
       </div></div></div>`;
     $('#go').onclick = () => {
       const host = $('#tbox');
@@ -829,7 +866,7 @@
           host.innerHTML = resultHTML(r, {
             passed, glyph: cn(l), title: passed ? `ผ่าน HSK ${l} แล้ว ประทับตราทุกบทให้เรียบร้อย` : 'ยังไม่ถึง 80% ลองเรียนบทที่เหลือก่อนแล้วกลับมาสอบใหม่',
             actions: passed
-              ? (l < 6 ? `<a class="btn red lg" href="#/level/${l + 1}">ไป HSK ${l + 1}${ic('arrow-right')}</a>` : `<a class="btn red lg" href="#/stats">ดูเส้นทางทั้งหมด</a>`) + `<a class="btn lg" href="#/">${ic('map')}แผนที่</a>`
+              ? (l < 6 ? `<a class="btn red lg" href="#/level/${l + 1}">ไป HSK ${l + 1}</a>` : `<a class="btn red lg" href="#/stats">ดูเส้นทางทั้งหมด</a>`) + `<a class="btn lg" href="#/">${ic('map')}แผนที่</a>`
               : `<button class="btn red lg" id="again">${ic('refresh-cw')}สอบอีกครั้ง</button><a class="btn lg" href="#/level/${l}">${ic('map')}กลับไปเรียน</a>`
           });
           bindSay(host);
@@ -851,7 +888,7 @@
       speak(n === 0 ? '妈妈' : C.toneSets[0].c[n - 1], 0.7);
     });
   }
-  const sandhiTable = () => `<div class="card" style="overflow-x:auto"><table class="table"><thead><tr><th>กฎ</th><th>ผลลัพธ์</th><th>ตัวอย่าง</th><th></th></tr></thead><tbody>${C.sandhi.map(s => `<tr><td>${s.rule}</td><td class="sec">${s.becomes}</td><td><span class="han" style="font-size:20px">${s.ex}</span> <span class="muted" style="text-decoration:line-through">${s.from}</span> → <b style="font-weight:500">${s.to}</b></td><td style="text-align:right"><button class="btn sm icon-only ghost" data-say="${s.ex}" aria-label="ฟัง">${ic('volume-2', 's16')}</button></td></tr>`).join('')}</tbody></table></div>`;
+  const sandhiTable = () => `<div class="card" style="overflow-x:auto"><table class="table"><thead><tr><th>กฎ</th><th>ผลลัพธ์</th><th>ตัวอย่าง</th><th></th></tr></thead><tbody>${C.sandhi.map(s => `<tr><td>${s.rule}</td><td class="sec">${s.becomes}</td><td><span class="han" style="font-size:20px">${s.ex}</span> <span class="muted" style="text-decoration:line-through">${s.from}</span> → <b style="font-weight:700">${s.to}</b></td><td style="text-align:right"><button class="btn sm icon-only ghost" data-say="${s.ex}" aria-label="ฟัง">${ic('volume-2', 's16')}</button></td></tr>`).join('')}</tbody></table></div>`;
   const pyGrid = list => `<div class="py-grid">${list.map(([k, th, c, p]) => `<button class="py-cell" data-say="${c}"><b>${k}</b><span>${th}</span><em><span class="han">${c}</span> ${p}</em></button>`).join('')}</div>`;
 
   function toneQuestions(n) {
@@ -861,7 +898,7 @@
       return {
         ask: 'ได้ยินวรรณยุกต์เสียงที่เท่าไร', prompt: `<button class="q-play" data-play aria-label="ฟังอีกครั้ง">${ic('volume-2')}</button>`, say: set.c[t], autoplay: true,
         options: [0, 1, 2, 3].map(k => ({ html: `<span class="row" style="gap:12px"><span style="color:var(--accent)">${toneSVG(C.tones[k], 40, 30)}</span><span>เสียง ${k + 1} <span class="muted">${set.syl.replace(/[aeiou]/, m => TONES[m][k])}</span></span></span>`, ok: k === t })),
-        note: `<span class="han" style="font-size:20px">${set.c[t]}</span> <span class="sec">${set.p[t]}</span> <span class="muted">· ${set.th[t]}</span>`
+        note: `<span class="han" style="font-size:20px">${set.c[t]}</span> <span class="sec">${set.p[t]}</span> <span class="muted">${set.th[t]}</span>`
       };
     });
   }
@@ -880,8 +917,8 @@
       const opts = shuffle([item[0], ...others.slice(0, 3)]);
       return {
         ask: isIni ? 'ได้ยินพยัญชนะต้นตัวไหน' : 'ได้ยินสระตัวไหน', prompt: `<button class="q-play" data-play aria-label="ฟังอีกครั้ง">${ic('volume-2')}</button>`, say: item[2], autoplay: true,
-        options: opts.map(o => ({ html: `<b style="font-weight:500;font-size:20px">${o}</b>`, ok: o === item[0] })),
-        note: `<span class="han" style="font-size:20px">${item[2]}</span> <span class="sec">${item[3]}</span> <span class="muted">· ${item[0]} ออกเสียงคล้าย ${item[1]}</span>`
+        options: opts.map(o => ({ html: `<b style="font-weight:700;font-size:20px">${o}</b>`, ok: o === item[0] })),
+        note: `<span class="han" style="font-size:20px">${item[2]}</span> <span class="sec">${item[3]}</span> <span class="muted">${item[0]} ออกเสียงคล้าย ${item[1]}</span>`
       };
     });
   }
@@ -899,7 +936,7 @@
   function baseQuizBlock(key, make, title) {
     const st = S.base[key];
     return `<section class="section" id="bq"><div class="section-head"><div><h2>${title}</h2><p class="muted" style="font-size:14px;margin-top:4px">10 ข้อ ตอบถูก 8 ข้อขึ้นไปเพื่อประทับตราด่านนี้</p></div>${st ? `<span class="done-note"><span class="seal" style="width:22px;height:22px;font-size:14px">印</span>ผ่านแล้ว</span>` : ''}</div>
-      <div id="bqhost"><div class="card pad row wrap" style="justify-content:space-between"><span class="sec">พร้อมแล้วกดเริ่ม เสียงจะเล่นเองทุกข้อ</span><button class="btn red" id="bqgo">เริ่มทำแบบฝึก${ic('arrow-right')}</button></div></div></section>`;
+      <div id="bqhost"><div class="card pad row wrap" style="justify-content:space-between"><span class="sec">พร้อมแล้วกดเริ่ม เสียงจะเล่นเองทุกข้อ</span><button class="btn red" id="bqgo">เริ่มทำแบบฝึก</button></div></div></section>`;
   }
   function bindBaseQuiz(key, make, glyph) {
     $('#bqgo').onclick = () => {
@@ -916,7 +953,7 @@
           host.innerHTML = resultHTML(r, {
             passed, glyph, title: passed ? 'ประทับตราด่านนี้แล้ว' : 'ฟังอีกสักรอบแล้วลองใหม่',
             actions: passed
-              ? `<a class="btn red lg" href="${nb ? `#/base/${nb.key}` : '#/unit/1-1'}">${nb ? nb.title : 'เริ่ม HSK 1 บทที่ 1'}${ic('arrow-right')}</a><a class="btn lg" href="#/level/0">${ic('map')}แผนที่</a>`
+              ? `<a class="btn red lg" href="${nb ? `#/base/${nb.key}` : '#/unit/1-1'}">${nb ? nb.title : 'เริ่ม HSK 1 บทที่ 1'}</a><a class="btn lg" href="#/level/0">${ic('map')}แผนที่</a>`
               : `<button class="btn red lg" id="again">${ic('refresh-cw')}ลองอีกครั้ง</button>`
           });
           const ag = $('#again', host); if (ag) ag.onclick = () => { host.innerHTML = '<div></div>'; viewBase(key); setTimeout(() => { const g = $('#bqgo'); if (g) { g.click(); $('#bq').scrollIntoView(); } }, 50); };
@@ -932,7 +969,7 @@
     return `<div class="page-head"><div>
       <div class="crumb"><a href="#/">แผนที่</a>${ic('chevron-right', 's16')}<a href="#/level/0">ฐาน</a>${ic('chevron-right', 's16')}<span>ด่านที่ ${i + 1}</span></div>
       <h1>${b.title}</h1><p class="lead">${lead}</p></div>
-      <div class="row">${i > 0 ? `<a class="btn" href="#/base/${BASE[i - 1].key}">${ic('chevron-left')}${BASE[i - 1].title}</a>` : ''}${i < BASE.length - 1 ? `<a class="btn" href="#/base/${BASE[i + 1].key}">${BASE[i + 1].title}${ic('chevron-right')}</a>` : ''}</div></div>`;
+      <div class="row">${i > 0 ? `<a class="btn" href="#/base/${BASE[i - 1].key}">ย้อนไป ${BASE[i - 1].title}</a>` : ''}${i < BASE.length - 1 ? `<a class="btn" href="#/base/${BASE[i + 1].key}">ต่อไป ${BASE[i + 1].title}</a>` : ''}</div></div>`;
   }
 
   function viewBase(key) {
@@ -948,9 +985,9 @@
         <section><div class="section-head"><h2>พยัญชนะต้น <span class="muted mono" style="font-size:14px">${C.initials.length}</span></h2></div>${pyGrid(C.initials)}</section>
         <section class="section"><div class="section-head"><h2>สระ <span class="muted mono" style="font-size:14px">${C.finals.length}</span></h2></div>${pyGrid(C.finals)}</section>
         <section class="section"><div class="card pad"><h3>จุดที่คนไทยมักพลาด</h3><div class="stack" style="gap:8px;margin-top:12px;color:var(--text-2)">
-          <p><b style="color:var(--text);font-weight:500">b d g</b> ไม่ใช่ บ ด ก แต่ใกล้ ป ต ก ไม่มีลม ส่วน <b style="color:var(--text);font-weight:500">p t k</b> คือ พ ท ค ที่มีลมพ่นออกมาชัดๆ</p>
-          <p><b style="color:var(--text);font-weight:500">zh ch sh r</b> ต้องม้วนปลายลิ้นขึ้นแตะเพดาน ส่วน <b style="color:var(--text);font-weight:500">z c s</b> ลิ้นแบนแตะหลังฟัน</p>
-          <p><b style="color:var(--text);font-weight:500">ü</b> ทำปากจู๋เหมือนจะพูด อู แต่ออกเสียง อี หลัง j q x y จะเขียนเป็น u เฉยๆ เช่น <span class="han">去</span> qù</p>
+          <p><b style="color:var(--text);font-weight:700">b d g</b> ไม่ใช่ บ ด ก แต่ใกล้ ป ต ก ไม่มีลม ส่วน <b style="color:var(--text);font-weight:700">p t k</b> คือ พ ท ค ที่มีลมพ่นออกมาชัดๆ</p>
+          <p><b style="color:var(--text);font-weight:700">zh ch sh r</b> ต้องม้วนปลายลิ้นขึ้นแตะเพดาน ส่วน <b style="color:var(--text);font-weight:700">z c s</b> ลิ้นแบนแตะหลังฟัน</p>
+          <p><b style="color:var(--text);font-weight:700">ü</b> ทำปากจู๋เหมือนจะพูด อู แต่ออกเสียง อี หลัง j q x y จะเขียนเป็น u เฉยๆ เช่น <span class="han">去</span> qù</p>
         </div></div></section>
         ${baseQuizBlock(key, pinyinQuestions, 'ฝึกฟังพินอิน')}</div>`;
       bindSay(app); bindBaseQuiz(key, pinyinQuestions, '拼');
@@ -958,22 +995,22 @@
       const need = 5;
       const doneN = () => C.practiceChars.filter(c => S.written[c]).length;
       app.innerHTML = `<div class="enter">${baseHead(b, 'อักษรจีนทุกตัวประกอบจากขีดพื้นฐานไม่กี่แบบ ถ้าเขียนตามลำดับที่ถูก ตัวจะสวยและจำได้ง่ายขึ้น')}
-        <section><div class="section-head"><h2>ขีดพื้นฐาน 8 แบบ</h2></div><div class="stroke-grid">${C.strokes.map(s => `<div class="card stroke-item"><span class="han">${s.c}</span><span><b style="font-weight:500">${s.n}</b><br><span class="sec" style="font-size:14px">${s.th}</span></span></div>`).join('')}</div></section>
+        <section><div class="section-head"><h2>ขีดพื้นฐาน 8 แบบ</h2></div><div class="stroke-grid">${C.strokes.map(s => `<div class="card stroke-item"><span class="han">${s.c}</span><span><b style="font-weight:700">${s.n}</b><br><span class="sec" style="font-size:14px">${s.th}</span></span></div>`).join('')}</div></section>
         <section class="section"><div class="section-head"><h2>หลักการเรียงขีด</h2><span class="muted" style="font-size:14px">กดที่ตัวอย่างเพื่อดูการเขียน</span></div>
           <div class="rad-grid">${C.strokeRules.map((r, i) => `<button class="card rad" data-anim="${r.ex}" style="cursor:pointer;text-align:left"><span class="r" id="sr${i}">${r.ex}</span><span class="sec" style="font-size:14px">${r.rule}</span></button>`).join('')}</div></section>
-        <section class="section" id="bq"><div class="section-head"><div><h2>ลองเขียน</h2><p class="muted" style="font-size:14px;margin-top:4px" id="wneed">เขียนให้ครบ ${need} ตัวเพื่อประทับตราด่านนี้ · ตอนนี้ ${doneN()}/${need}</p></div>${S.base[key] ? `<span class="done-note"><span class="seal" style="width:22px;height:22px;font-size:14px">印</span>ผ่านแล้ว</span>` : ''}</div><div id="wp"></div></section></div>`;
+        <section class="section" id="bq"><div class="section-head"><div><h2>ลองเขียน</h2><p class="muted" style="font-size:14px;margin-top:4px" id="wneed">เขียนให้ครบ ${need} ตัวเพื่อประทับตราด่านนี้ (ตอนนี้ ${doneN()}/${need})</p></div>${S.base[key] ? `<span class="done-note"><span class="seal" style="width:22px;height:22px;font-size:14px">印</span>ผ่านแล้ว</span>` : ''}</div><div id="wp"></div></section></div>`;
       $$('[data-anim]', app).forEach(btn => btn.onclick = () => { const s = $('.r', btn); s.innerHTML = ''; s.style.width = s.style.height = '56px'; const bx = writerBox(btn.dataset.anim, 56, { showCharacter: false }); s.appendChild(bx.el); animate(bx.w); });
       writePractice($('#wp'), C.practiceChars, {
         infoFor: c => `<p class="sec" style="font-size:14px">เส้นประในตารางคือ 米字格 ช่วยกะสัดส่วนของตัวอักษร</p>`,
         onWritten: () => {
           const d = doneN();
-          $('#wneed').textContent = `เขียนให้ครบ ${need} ตัวเพื่อประทับตราด่านนี้ · ตอนนี้ ${Math.min(d, need)}/${need}`;
+          $('#wneed').textContent = `เขียนให้ครบ ${need} ตัวเพื่อประทับตราด่านนี้ (ตอนนี้ ${Math.min(d, need)}/${need})`;
           if (d >= need && !S.base[key]) { S.base[key] = { done: true, best: 100 }; save(); addXP(20); toast('ประทับตราด่านขีดและลำดับการเขียนแล้ว'); }
         }
       });
     } else {
       app.innerHTML = `<div class="enter">${baseHead(b, 'หมวดนำคือส่วนประกอบที่บอกใบ้ความหมายของอักษร เช่น 氵 เกี่ยวกับน้ำ เห็นแล้วเดาได้ว่า 河 洗 澡 เกี่ยวกับน้ำ กดที่ตัวอย่างเพื่อฟังเสียง')}
-        <div class="rad-grid">${C.radicals.map(r => `<div class="card rad"><span class="r">${r.r}</span><span><b style="font-weight:500">${r.name}</b><br><span class="x">${[...r.ex].map(c => `<button data-say="${c}">${c}</button>`).join('')}</span></span></div>`).join('')}</div>
+        <div class="rad-grid">${C.radicals.map(r => `<div class="card rad"><span class="r">${r.r}</span><span><b style="font-weight:700">${r.name}</b><br><span class="x">${[...r.ex].map(c => `<button data-say="${c}">${c}</button>`).join('')}</span></span></div>`).join('')}</div>
         ${baseQuizBlock(key, radicalQuestions, 'ทายความหมายหมวดนำ')}</div>`;
       bindSay(app); bindBaseQuiz(key, radicalQuestions, '部');
     }
@@ -1046,9 +1083,9 @@
       speak(w.h);
       const d1 = INT[Math.min(8, c.b + 1)], d2 = INT[Math.min(8, c.b + 2)];
       $('#acts', host).innerHTML = `<div class="rev-btns" style="padding-top:0">
-        <button class="btn" data-g="0">ลืมแล้ว<small>10 นาที · 1</small></button>
-        <button class="btn" data-g="1">จำได้<small>${d1} วัน · 2</small></button>
-        <button class="btn" data-g="2">ง่ายมาก<small>${d2} วัน · 3</small></button></div>`;
+        <button class="btn" data-g="0">ลืมแล้ว<small>10 นาที <kbd>1</kbd></small></button>
+        <button class="btn" data-g="1">จำได้<small>${d1} วัน <kbd>2</kbd></small></button>
+        <button class="btn" data-g="2">ง่ายมาก<small>${d2} วัน <kbd>3</kbd></small></button></div>`;
       $$('[data-g]', host).forEach(b => b.onclick = () => rate(+b.dataset.g));
     }
     function rate(g) {
@@ -1087,7 +1124,7 @@
   function wordModal(w) {
     const u = unitOf[w.id]; const c = S.srs[w.id];
     modal(`<div style="text-align:center">
-      <div class="mono muted" style="font-size:12px">HSK ${w.l} · บทที่ ${u.n}</div>
+      <div class="muted" style="font-size:13px;font-weight:700">HSK ${w.l} บทที่ ${u.n}</div>
       <div class="han" style="font-size:88px;line-height:1.15;margin-top:8px">${esc(w.h)}</div>
       <div style="font-size:20px;color:var(--text-2)">${esc(w.p)}</div>
       ${w.th ? `<div style="font-size:18px;margin-top:12px">${esc(w.th)}</div>` : ''}
@@ -1144,7 +1181,7 @@
           <p class="d">${esc(g.d)}</p>
           ${g.ex.map(e => `<div class="ex"><button class="btn sm icon-only ghost" data-say="${esc(e[0])}" aria-label="ฟังประโยค">${ic('volume-2', 's16')}</button><span class="zh">${esc(e[0])}</span><span class="py">${esc(e[1])}</span><span class="th">${esc(e[2])}</span></div>`).join('')}
         </article>`).join('')}</div>
-        <aside class="stack"><div class="card pad"><h3>HSK ${l} · ${esc(C.levelInfo[l].name)}</h3><p class="sec" style="font-size:14px;margin-top:4px">${esc(C.levelInfo[l].blurb)}</p>
+        <aside class="stack"><div class="card pad"><h3>HSK ${l} ${esc(C.levelInfo[l].name)}</h3><p class="sec" style="font-size:14px;margin-top:4px">${esc(C.levelInfo[l].blurb)}</p>
           <div style="margin-top:16px"><div class="kv"><span>หัวข้อ</span><span>${list.length}</span></div><div class="kv"><span>บทที่ผ่าน</span><span>${unitsDoneIn(l)}/${UNITS[l].length}</span></div></div>
           <a class="btn" style="width:100%;margin-top:16px" href="#/level/${l}">${ic('map')}เส้นทาง HSK ${l}</a></div></aside></div></div>`;
     bindSay(app);
@@ -1162,7 +1199,7 @@
     for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
       const x = S.days[dkey(d)] || 0;
       const lvl = !x ? 0 : x < 15 ? 1 : x < 40 ? 2 : x < 80 ? 3 : 4;
-      cells.push(`<i class="${lvl ? 'l' + lvl : ''} ${dkey(d) === dkey() ? 'today' : ''}" title="${dkey(d)} · ${x} XP"></i>`);
+      cells.push(`<i class="${lvl ? 'l' + lvl : ''} ${dkey(d) === dkey() ? 'today' : ''}" title="${dkey(d)}: ${x} XP"></i>`);
     }
     const activeDays = Object.values(S.days).filter(Boolean).length;
     const sw = (k, on) => `<button class="switch ${on ? 'on' : ''}" data-sw="${k}" role="switch" aria-checked="${on}"></button>`;
@@ -1179,7 +1216,7 @@
           <div class="card pad"><div class="section-head"><h2>ความคืบหน้าแต่ละระดับ</h2><span class="muted" style="font-size:13px">บทที่ผ่าน</span></div>
             <div class="lvbars">${[0, ...LEVELS].map(l => {
               const tot = l ? UNITS[l].length : BASE.length; const d = l ? unitsDoneIn(l) : BASE.filter(b => S.base[b.key]).length;
-              return `<a class="lvbar" href="#/level/${l}"><span>${l ? `HSK ${l}` : 'ฐาน'}</span><span class="bar ${l === cl ? 'accent' : ''}"><i style="width:${pct(d, tot)}%"></i></span><span class="n">${d}/${tot} · ${pct(d, tot)}%</span></a>`;
+              return `<a class="lvbar" href="#/level/${l}"><span>${l ? `HSK ${l}` : 'ฐาน'}</span><span class="bar ${l === cl ? 'accent' : ''}"><i style="width:${pct(d, tot)}%"></i></span><span class="n">${d}/${tot} บท</span></a>`;
             }).join('')}</div></div>
           <div class="card pad"><div class="section-head"><h2>กิจกรรม ${weeks} สัปดาห์</h2>
             <span class="legend">น้อย <i style="background:var(--line)"></i><i class="l1" style="background:color-mix(in srgb,var(--accent) 30%,var(--card))"></i><i style="background:color-mix(in srgb,var(--accent) 55%,var(--card))"></i><i style="background:color-mix(in srgb,var(--accent) 80%,var(--card))"></i><i style="background:var(--accent)"></i> มาก</span></div>
@@ -1303,7 +1340,7 @@
   }
   function practiceHead(title, lead) {
     return `<div class="page-head"><div><div class="crumb"><a href="#/practice">ฝึกฝน</a>${ic('chevron-right', 's16')}<span>${title}</span></div><h1>${title}</h1><p class="lead">${lead}</p></div>
-      <span class="mono muted" style="font-size:13px">แหล่งคำ: ${poolLabel()} · ${fmt(poolWords().length)} คำ</span></div>`;
+      <span class="mono muted" style="font-size:13px">แหล่งคำ: ${poolLabel()} (${fmt(poolWords().length)} คำ)</span></div>`;
   }
   const fmtTime = ms => { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1337,7 +1374,7 @@
     function intro() {
       host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp grey">配</div><h2 style="margin-top:24px">พร้อมจับเวลา</h2>
         <p class="sec" style="margin-top:8px">3 รอบ รอบละ 6 คู่ จับผิดได้ แต่จะนับไว้</p>${S.matchBest ? `<p class="mono muted" style="font-size:13px;margin-top:12px">สถิติดีที่สุด ${fmtTime(S.matchBest)}</p>` : ''}
-        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่ม${ic('arrow-right')}</button></div></div>`;
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่ม</button></div></div>`;
       $('#go', host).onclick = () => { round = 0; miss = 0; start = Date.now(); timer = setInterval(tick, 500); next(); };
     }
     function tick() { const t = $('#mt', host); if (t) t.textContent = fmtTime(Date.now() - start); }
@@ -1371,7 +1408,7 @@
       if (best) S.matchBest = t;
       S.counters.matches++; save(); addXP(5);
       host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp">配</div><div class="score">${fmtTime(t)}</div>
-        <p class="sec" style="margin-top:8px">${best ? 'สถิติใหม่ · ' : ''}จับผิด ${miss} ครั้ง</p>
+        <p class="sec" style="margin-top:8px">${best ? 'สถิติใหม่<br>' : ''}จับผิด ${miss} ครั้ง</p>
         <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}เล่นอีกครั้ง</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a></div></div>`;
       $('#again', host).onclick = () => { round = 0; miss = 0; start = Date.now(); timer = setInterval(tick, 500); next(); };
     }
@@ -1427,7 +1464,7 @@
         speak(q.zh);
         $$('#ans .tile', host).forEach(b => { b.disabled = true; b.classList.add(ok ? 'done-ok' : 'bad'); });
         $('#bank', host).innerHTML = '';
-        $('#onote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(q.zh)}</span><br><span class="muted">${esc(q.py)} · โครงสร้าง ${esc(q.pat)}</span></span><button class="btn primary" id="nx">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'}</button>`;
+        $('#onote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(q.zh)}</span><br><span class="muted">${esc(q.py)}<br>โครงสร้าง ${esc(q.pat)}</span></span><button class="btn primary" id="nx">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'}</button>`;
         $('#nx', host).onclick = () => { i++; show(); };
         $('#nx', host).focus();
       };
@@ -1466,7 +1503,7 @@
         inp.disabled = true; inp.classList.add(ok ? 'ok' : 'no');
         if (ok) { score++; addXP(3); if (S.miss[w.id]) { S.miss[w.id]--; if (!S.miss[w.id]) delete S.miss[w.id]; } } else { wrong.push(w); S.miss[w.id] = (S.miss[w.id] || 0) + 1; }
         save();
-        $('#dnote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(w.h)}</span> <span class="sec">${esc(w.p)}</span> <span class="muted">· ${esc(short(w))}</span></span><button class="btn primary" id="nx" type="button">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'} <kbd style="background:transparent;color:inherit;border-color:currentColor;opacity:.6">Enter</kbd></button>`;
+        $('#dnote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(w.h)}</span> <span class="sec">${esc(w.p)}</span> <span class="muted">${esc(short(w))}</span></span><button class="btn primary" id="nx" type="button">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'} <kbd style="background:transparent;color:inherit;border-color:currentColor;opacity:.6">Enter</kbd></button>`;
         $('#nx', host).onclick = () => { i++; show(); };
         $('#nx', host).focus();
       };
@@ -1541,7 +1578,7 @@
     const host = $('#lp');
     if (!words.length) { host.innerHTML = `<div class="card empty"><div class="stamp grey">${glyph}</div><h2>ยังไม่มีคำ</h2><p>${emptyMsg}</p><div class="row" style="justify-content:center;margin-top:24px"><a class="btn" href="#/practice">กลับไปหน้าฝึกฝน</a></div></div>`; return; }
     const list = () => `<div class="card pad"><div class="row wrap" style="justify-content:space-between;margin-bottom:12px"><h3>${words.length} คำ</h3><button class="btn red" id="go">${ic('circle-check')}ฝึก ${Math.min(15, Math.max(words.length, 4))} ข้อ</button></div>
-      <div class="wl-grid">${words.map(w => `<button class="wrow" data-word="${w.id}"><span class="han">${esc(w.h)}</span><span style="min-width:0"><div class="t">${esc(short(w))}</div><div class="p">${esc(w.p)}${S.miss[w.id] ? ` · ผิด ${S.miss[w.id]} ครั้ง` : ''}</div></span></button>`).join('')}</div></div>`;
+      <div class="wl-grid">${words.map(w => `<button class="wrow" data-word="${w.id}"><span class="han">${esc(w.h)}</span><span style="min-width:0"><div class="t">${esc(short(w))}</div><div class="p">${esc(w.p)}${S.miss[w.id] ? ` (ผิด ${S.miss[w.id]} ครั้ง)` : ''}</div></span></button>`).join('')}</div></div>`;
     host.innerHTML = list();
     $('#go', host).onclick = () => {
       const n = Math.min(15, Math.max(words.length, 4));
@@ -1568,7 +1605,7 @@
     function intro() {
       host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp grey">${ic('gauge')}</div><h2 style="margin-top:24px">ใช้เวลาราว 3–8 นาที</h2>
         <p class="sec" style="margin-top:8px">ตอบตามที่รู้จริง ไม่รู้ให้เดาน้อยที่สุด ผลจะแนะนำว่าควรเริ่มเรียนที่ระดับไหน</p>
-        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มวัดระดับ${ic('arrow-right')}</button></div></div>`;
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มวัดระดับ</button></div></div>`;
       $('#go', host).onclick = () => level(1);
     }
     function level(l) {
@@ -1579,7 +1616,7 @@
           scores[l] = r.score;
           if (r.score >= 5 && l < 6) {
             host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp">${cn(l)}</div><h2 style="margin-top:24px">ผ่าน HSK ${l} (${r.score}/6)</h2><p class="sec" style="margin-top:8px">ไปต่อที่ HSK ${l + 1}</p>
-              <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="nx">ไปต่อ${ic('arrow-right')}</button><button class="btn lg" id="stop">พอแค่นี้</button></div></div>`;
+              <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="nx">ไปต่อ</button><button class="btn lg" id="stop">พอแค่นี้</button></div></div>`;
             $('#nx', host).onclick = () => level(l + 1); $('#stop', host).onclick = () => result(l);
           } else result(r.score >= 5 ? l : l - 1);
         }
@@ -1592,7 +1629,7 @@
         <p class="sec" style="margin-top:8px">${passed ? `${passed === 6 ? 'ฝีมือระดับสูงสุดแล้ว ฝึกคำ HSK 6 ต่อให้แน่น' : `แนะนำให้เริ่มเรียนที่ HSK ${start}`}` : 'เรียนวรรณยุกต์และพินอินก่อน แล้วเข้าสู่ HSK 1'}</p>
         <div class="row wrap mono muted" style="justify-content:center;gap:16px;margin-top:16px;font-size:13px">${Object.entries(scores).map(([l, s]) => `<span>HSK ${l}: ${s}/6</span>`).join('')}</div>
         <div class="row wrap" style="justify-content:center;margin-top:24px">
-          ${passed ? `<button class="btn red lg" id="skip">ประทับตรา HSK 1–${passed} แล้วไป HSK ${start}</button>` : `<a class="btn red lg" href="#/base/tones">เริ่มที่ฐาน${ic('arrow-right')}</a>`}
+          ${passed ? `<button class="btn red lg" id="skip">ประทับตรา HSK 1–${passed} แล้วไป HSK ${start}</button>` : `<a class="btn red lg" href="#/base/tones">เริ่มที่ฐาน</a>`}
           ${passed ? `<a class="btn lg" href="#/test/${passed}">สอบเต็มของ HSK ${passed} ก่อน</a>` : ''}</div>
         ${passed ? '<p class="muted" style="font-size:13px;margin-top:16px">การประทับตราจะปลดล็อกบทเรียนให้ทันที แต่ไม่เพิ่มคำเหล่านั้นเข้าการทบทวน</p>' : ''}</div>`;
       const sk = $('#skip', host);
@@ -1614,7 +1651,7 @@
   function applyTheme() {
     const t = S.settings.theme;
     if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t;
-    const meta = $('meta[name="theme-color"]'); if (meta) meta.content = cssVar('--bg') || '#f7f4ee';
+    const meta = $('meta[name="theme-color"]'); if (meta) meta.content = cssVar('--color-bar') || '#1f1b16';
   }
   applyTheme();
   matchMedia('(prefers-color-scheme: dark)').addEventListener && matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);

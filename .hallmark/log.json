@@ -1,0 +1,33 @@
+[
+ {
+  "mode": "redesign",
+  "depth": "full",
+  "scope": "site",
+  "shape": "Stage hero, fact bento, level path, stuck-down level cards",
+  "theme": "sticker",
+  "axes": "light/display-heavy/chromatic-vermilion",
+  "hero": "Stage",
+  "nav": "slab bar",
+  "footer": "ink band",
+  "imagery": "progress map",
+  "photos": [],
+  "entry": "index.html",
+  "fingerprint": "stage/bento/path/cards/ink-footer",
+  "sections": [
+   "stage",
+   "bento",
+   "path",
+   "levels",
+   "footer"
+  ],
+  "signature": "the ink-wash mountain map as a die-cut sticker with a stamp per station",
+  "waived": [
+   "37",
+   "80",
+   "39b",
+   "79"
+  ],
+  "prompt": "Thai learner course from zero Chinese to HSK 6 with a progress roadmap",
+  "date": "2026-11-18"
+ }
+]
