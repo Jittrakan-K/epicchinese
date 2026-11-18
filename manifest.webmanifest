@@ -1,0 +1,10 @@
+{
+  "name": "Epic Chinese · ภาษาจีนจากศูนย์ถึง HSK 6",
+  "short_name": "Epic Chinese",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f4ee",
+  "theme_color": "#f7f4ee",
+  "lang": "th",
+  "icons": [{ "src": "assets/seal.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
