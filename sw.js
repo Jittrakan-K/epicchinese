@@ -1,5 +1,5 @@
 /* แคชไฟล์ของเว็บไว้ใช้ตอนออฟไลน์ เปลี่ยน VERSION ทุกครั้งที่อัปเดตไฟล์หลัก */
-const VERSION = 'epic-v1';
+const VERSION = 'epic-v2';
 const SHELL = ['./', 'index.html', 'css/style.css', 'js/app.js', 'js/icons.js', 'js/data-words.js', 'js/data-content.js', 'vendor/hanzi-writer.min.js', 'assets/seal.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {

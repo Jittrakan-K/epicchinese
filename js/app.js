@@ -46,12 +46,12 @@
 
   /* ---------- store ---------- */
   const KEY = 'epicchinese.v1';
-  const DEF = { units: {}, base: {}, tests: {}, srs: {}, written: {}, xp: 0, days: {}, settings: { pinyin: true, rate: 0.85, goal: 50, theme: 'auto', free: false } };
+  const DEF = { units: {}, base: {}, tests: {}, srs: {}, written: {}, stars: {}, miss: {}, ach: {}, counters: { reviews: 0, perfect: 0, spoken: 0, matches: 0 }, xp: 0, days: {}, settings: { pinyin: true, rate: 0.85, goal: 50, theme: 'auto', free: false, pool: 'auto' } };
   const clone = o => JSON.parse(JSON.stringify(o));
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && typeof s === 'object') return Object.assign(clone(DEF), s, { settings: Object.assign(clone(DEF.settings), s.settings || {}) });
+      if (s && typeof s === 'object') return Object.assign(clone(DEF), s, { settings: Object.assign(clone(DEF.settings), s.settings || {}), counters: Object.assign(clone(DEF.counters), s.counters || {}) });
     } catch (e) { /* ignore */ }
     return clone(DEF);
   }
@@ -198,10 +198,11 @@
   const app = $('#app');
   const NAV = [
     ['/', 'map', 'แผนที่'], ['/review', 'rotate-ccw', 'ทบทวน'], ['/dict', 'book-open', 'คลังคำ'],
-    ['/grammar', 'scroll-text', 'ไวยากรณ์'], ['/sounds', 'audio-lines', 'ฝึกเสียง'], ['/stats', 'chart-column', 'สถิติ']
+    ['/practice', 'target', 'ฝึกฝน'], ['/grammar', 'scroll-text', 'ไวยากรณ์'], ['/stats', 'chart-column', 'สถิติ']
   ];
   function navOn(path, href) {
     if (href === '/') return path === '/' || /^\/(level|unit|test|base)/.test(path);
+    if (href === '/practice') return path.startsWith('/practice') || path.startsWith('/sounds');
     return path.startsWith(href);
   }
   function renderChrome(path) {
@@ -212,6 +213,7 @@
     renderMeta();
   }
   function renderMeta() {
+    checkAch();
     const st = streak(); const t = todayXP(); const g = S.settings.goal;
     const el = $('#topmeta'); if (!el) return;
     el.innerHTML = `<span class="item" title="วันที่เรียนต่อเนื่อง">${ic('flame', 's16')}<span class="mono">${st} วัน</span></span>
@@ -250,6 +252,8 @@
     [/^\/dict$/, () => viewDict()],
     [/^\/grammar(?:\/([1-6]))?$/, m => viewGrammar(+(m[1] || Math.max(1, curLevel())))],
     [/^\/sounds$/, () => viewSounds()],
+    [/^\/practice$/, () => viewPractice()],
+    [/^\/practice\/(match|order|dictation|speak|mistakes|stars|placement)$/, m => PRACTICE_VIEWS[m[1]]()],
     [/^\/stats$/, () => viewStats()]
   ];
   function route() {
@@ -474,9 +478,9 @@
             <a class="link" href="#/level/${lv}">ดูทั้งระดับ${ic('chevron-right', 's16')}</a></div>
           <div class="path-wrap" id="path"></div>
         </div>
-        <aside class="stack">${todayCard()}${levelsCard(lv)}</aside>
+        <aside class="stack">${wodCard()}${todayCard()}${levelsCard(lv)}</aside>
       </section></div>`;
-    bindHero(app);
+    bindHero(app); bindSay(app);
     mountPath($('#path'), lv, false);
     let t; onView('resize', () => { clearTimeout(t); t = setTimeout(() => { const h = $('.hero'); if (h) { $('svg.land', h).outerHTML = heroSVG(); bindHero(h); } }, 150); });
   }
@@ -503,7 +507,6 @@
               <div class="kv"><span>คำศัพท์</span><span>${fmt(words)} คำ</span></div>
               <div class="kv"><span>คำต่อบท</span><span>${SIZE[l]} คำ</span></div>
               <div class="kv"><span>สอบวัดระดับ</span><span>${levelPassed(l) ? `ผ่าน ${S.tests[l].best}%` : 'ยังไม่สอบ'}</span></div>
-              <div class="kv"><span>ความหมาย</span><span>${l <= 3 ? 'ไทย + อังกฤษ' : 'อังกฤษ'}</span></div>
             </div>
             <div class="stack" style="gap:8px;margin-top:16px">
               <a class="btn" href="#/grammar/${l}">${ic('scroll-text')}ไวยากรณ์ HSK ${l}</a>
@@ -567,6 +570,7 @@
   function runQuiz(host, qs, { onFinish, xpEach = 3, label = '' } = {}) {
     let i = 0, score = 0; const wrong = [];
     let answered = false;
+    const qid = {}; host._qid = qid;
     function show() {
       const q = qs[i]; answered = false;
       host.innerHTML = `<div class="quiz">
@@ -589,6 +593,7 @@
       const btns = $$('.q-opt', host);
       btns.forEach((b, j) => { b.disabled = true; if (q.options[j].ok) b.classList.add('right'); });
       const ok = q.options[k].ok;
+      if (q.word) { const id = q.word.id; if (ok) { if (S.miss[id]) { S.miss[id]--; if (!S.miss[id]) delete S.miss[id]; } } else S.miss[id] = (S.miss[id] || 0) + 1; }
       if (ok) { score++; addXP(xpEach); } else { btns[k].classList.add('wrong'); if (q.word) wrong.push(q.word); }
       if (q.say && (q.sayAfter || !ok)) speak(q.say);
       const w = q.word;
@@ -603,10 +608,10 @@
       clearTimeout(host._t);
       if (!answered) return;
       i++;
-      if (i < qs.length) show(); else onFinish({ score, total: qs.length, wrong });
+      if (i < qs.length) show(); else { if (score === qs.length && qs.length >= 10) { S.counters.perfect++; save(); } host._qid = null; onFinish({ score, total: qs.length, wrong }); }
     }
     const key = e => {
-      if (!host.isConnected) return;
+      if (!host.isConnected || host._qid !== qid) return;
       if (e.target.tagName === 'INPUT') return;
       if (!answered && /^[1-4]$/.test(e.key)) { const k = +e.key - 1; if (qs[i] && k < qs[i].options.length) choose(k); }
       else if (answered && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); next(); }
@@ -633,8 +638,8 @@
     if (!u) { location.hash = '#/'; return; }
     if (!unitUnlocked(l, n)) {
       app.innerHTML = `<div class="card empty enter"><div class="stamp grey">${ic('lock')}</div><h2>บทที่ ${n} ยังไม่เปิด</h2>
-        <p>เรียนบทที่ ${n - 1} ให้ผ่านก่อน หรือถ้ามีพื้นฐานแล้ว ลองสอบข้ามระดับ HSK ${l}</p>
-        <div class="row" style="justify-content:center;margin-top:24px"><a class="btn primary" href="#/unit/${l}-${n - 1}">ไปบทที่ ${n - 1}</a><a class="btn" href="#/test/${l}">สอบข้ามระดับ</a></div></div>`;
+        <p>${n > 1 ? `เรียนบทที่ ${n - 1} ให้ผ่านก่อน` : `ผ่าน HSK ${l - 1} ให้ครบก่อน`} หรือถ้ามีพื้นฐานแล้ว ลองสอบข้ามระดับ HSK ${l} หรือทำแบบวัดระดับ</p>
+        <div class="row wrap" style="justify-content:center;margin-top:24px"><a class="btn primary" href="${n > 1 ? `#/unit/${l}-${n - 1}` : `#/level/${l - 1}`}">${n > 1 ? `ไปบทที่ ${n - 1}` : `ไป HSK ${l - 1}`}</a><a class="btn" href="#/test/${l}">สอบข้ามระดับ</a><a class="btn" href="#/practice/placement">วัดระดับ</a></div></div>`;
       return;
     }
     const st = S.units[u.key];
@@ -676,6 +681,7 @@
         <div class="tools">
           <button class="btn" id="say">${ic('volume-2')}ฟังเสียง <kbd>Space</kbd></button>
           <button class="btn" id="strk">${ic('pen-line')}ลำดับขีด</button>
+          ${starBtn(w.id)}
         </div>
         <div class="stroke-box" id="sb"></div>
         <div class="nav-row">
@@ -816,7 +822,7 @@
           S.tests[l] = { passed: passed || !!(prev && prev.passed), best: Math.max(p, prev ? prev.best : 0) };
           if (first) {
             UNITS[l].forEach(u => { if (!unitDone(u.key)) S.units[u.key] = { done: true, best: p, at: Date.now(), viaTest: true }; });
-            addToSRS(pool.map(w => w.id));
+            addToSRS(r.wrong.map(w => w.id));
             addXP(50);
           }
           save();
@@ -1047,7 +1053,7 @@
     }
     function rate(g) {
       const id = queue.shift();
-      grade(id, g); addXP(2);
+      grade(id, g); S.counters.reviews++; addXP(2);
       if (g === 0) queue.push(id); else done++;
       show();
     }
@@ -1089,7 +1095,8 @@
       <div class="stroke-box" id="msb"></div>
       <div class="row wrap" style="justify-content:center;margin-top:20px">
         <button class="btn" id="msay">${ic('volume-2')}ฟังเสียง</button>
-        <button class="btn" id="mst">${ic('play')}ลำดับขีดอีกครั้ง</button>
+        <button class="btn" id="mst">${ic('play')}ลำดับขีด</button>
+        ${starBtn(w.id)}
         <a class="btn" href="#/unit/${u.key}">${ic('layers')}ไปที่บทนี้</a>
       </div>
       <p class="muted" style="font-size:13px;margin-top:16px">${c ? `อยู่ในการทบทวน กล่อง ${c.b}` : unitDone(u.key) ? 'เรียนแล้ว' : 'ยังไม่ได้เรียน'}</p></div>`,
@@ -1105,14 +1112,14 @@
     app.innerHTML = `<div class="enter">
       <div class="page-head"><div><h1>คลังคำ</h1><p class="lead">${fmt(W.length)} คำของ HSK 1 ถึง 6 ค้นหาด้วยตัวจีน พินอินแบบไม่ใส่วรรณยุกต์ ภาษาไทย หรือภาษาอังกฤษ</p></div></div>
       <div class="row wrap" style="gap:16px"><label class="search">${ic('search')}<span class="sr">ค้นหา</span><input id="q" placeholder="ค้นหา เช่น 学 xuexi เรียน study" autocomplete="off"></label>
-        <div class="chips" id="lvs">${[0, ...LEVELS].map(l => `<button class="chip ${l === 0 ? 'on' : ''}" data-l="${l}">${l ? `HSK ${l}` : 'ทั้งหมด'}</button>`).join('')}</div></div>
+        <div class="chips" id="lvs">${[0, ...LEVELS, -1].map(l => `<button class="chip ${l === 0 ? 'on' : ''}" data-l="${l}">${l > 0 ? `HSK ${l}` : l < 0 ? 'บันทึกไว้' : 'ทั้งหมด'}</button>`).join('')}</div></div>
       <p class="muted mono" style="font-size:13px;margin-top:16px" id="cnt"></p>
       <div class="dict-list" id="dl"></div>
       <div class="row" style="justify-content:center;margin-top:24px"><button class="btn" id="more" hidden>แสดงเพิ่ม</button></div></div>`;
     const learned = new Set(learnedIds());
     function run() {
       const qq = q.trim().toLowerCase(); const qp = plain(qq);
-      const res = W.filter(w => (!lv || w.l === lv) && (!qq || w.h.includes(qq) || (qp && plain(w.p).includes(qp)) || (w.th && w.th.includes(qq)) || w.en.toLowerCase().includes(qq)));
+      const res = W.filter(w => (!lv || (lv < 0 ? S.stars[w.id] : w.l === lv)) && (!qq || w.h.includes(qq) || (qp && plain(w.p).includes(qp)) || (w.th && w.th.includes(qq)) || w.en.toLowerCase().includes(qq)));
       if (qq) res.sort((a, b) => (b.h === qq || plain(b.p) === qp) - (a.h === qq || plain(a.p) === qp));
       $('#cnt').textContent = `${fmt(res.length)} คำ`;
       $('#dl').innerHTML = res.slice(0, limit).map(w => `<button class="dict-item" data-id="${w.id}"><span><span class="han">${esc(w.h)}</span> <span class="p">${esc(w.p)}</span>${learned.has(w.id) ? '<span class="seen-dot" title="เรียนแล้ว" style="width:6px;height:6px;border-radius:2px;background:var(--accent);display:inline-block;margin-left:8px;vertical-align:middle"></span>' : ''}</span><span class="lv">HSK ${w.l}</span><span class="m">${esc(mean(w))}</span></button>`).join('');
@@ -1177,6 +1184,8 @@
           <div class="card pad"><div class="section-head"><h2>กิจกรรม ${weeks} สัปดาห์</h2>
             <span class="legend">น้อย <i style="background:var(--line)"></i><i class="l1" style="background:color-mix(in srgb,var(--accent) 30%,var(--card))"></i><i style="background:color-mix(in srgb,var(--accent) 55%,var(--card))"></i><i style="background:color-mix(in srgb,var(--accent) 80%,var(--card))"></i><i style="background:var(--accent)"></i> มาก</span></div>
             <div class="heat-wrap"><div class="heat">${cells.join('')}</div></div></div>
+          <div class="card pad"><div class="section-head"><h2>ตราประทับความสำเร็จ</h2><span class="mono muted" style="font-size:13px">${ACH.filter(a => S.ach[a.k]).length}/${ACH.length}</span></div>
+            <div class="ach-grid">${ACH.map(a => `<div class="ach ${S.ach[a.k] ? 'on' : ''}"><span class="ach-seal">${esc(a.g)}</span><b>${esc(a.t)}</b><span>${esc(a.d)}</span></div>`).join('')}</div></div>
         </div>
         <aside class="stack">
           <div class="card pad"><h3>ตั้งค่า</h3>
@@ -1219,6 +1228,387 @@
       $('#yes', m).onclick = () => { S = clone(DEF); save(); close(); applyTheme(); location.hash = '#/'; route(); toast('เริ่มต้นใหม่แล้ว'); };
     });
   }
+
+  /* ---------- bookmarks, word of the day, achievements ---------- */
+  function starBtn(id, size = '') {
+    const on = !!S.stars[id];
+    return `<button class="btn ${size} star ${on ? 'on' : ''}" data-star="${id}" aria-pressed="${on}">${ic('star', 's16')}<span>${on ? 'บันทึกแล้ว' : 'บันทึก'}</span></button>`;
+  }
+  document.addEventListener('click', e => {
+    const st = e.target.closest('[data-star]');
+    if (st) {
+      const id = +st.dataset.star;
+      if (S.stars[id]) delete S.stars[id]; else S.stars[id] = Date.now();
+      save();
+      $$(`[data-star="${id}"]`).forEach(b => { const on = !!S.stars[id]; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); $('span', b).textContent = on ? 'บันทึกแล้ว' : 'บันทึก'; });
+      renderMeta();
+      return;
+    }
+    const wd = e.target.closest('[data-word]');
+    if (wd) wordModal(W[+wd.dataset.word]);
+  });
+  function wordOfDay() {
+    const lv = Math.max(1, curLevel());
+    const pool = W.filter(w => w.l === lv);
+    const d = new Date();
+    const seed = (d.getFullYear() * 372 + d.getMonth() * 31 + d.getDate()) * 2654435761 >>> 0;
+    return pool[seed % pool.length];
+  }
+  function wodCard() {
+    const w = wordOfDay();
+    return `<div class="card pad wod"><div class="row" style="justify-content:space-between"><h3>คำประจำวัน</h3><span class="mono muted" style="font-size:12px">HSK ${w.l}</span></div>
+      <div class="han" style="font-size:56px;line-height:1.15;margin-top:12px">${esc(w.h)}</div>
+      <div class="sec" style="font-size:16px">${esc(w.p)}</div><div style="margin-top:4px">${esc(w.th)}</div>
+      <div class="row wrap" style="margin-top:16px;gap:8px"><button class="btn sm" data-say="${esc(w.h)}">${ic('volume-2', 's16')}ฟัง</button>${starBtn(w.id, 'sm')}<button class="btn sm ghost" data-word="${w.id}">ลำดับขีด</button></div></div>`;
+  }
+  const ACH = [
+    { k: 'u1', g: '始', t: 'ก้าวแรก', d: 'ผ่านบทเรียนบทแรก', ok: () => Object.values(S.units).some(u => u.done) },
+    { k: 'base', g: '基', t: 'ปูพื้นครบ', d: 'ผ่านฐานครบ 4 ด่าน', ok: baseDoneAll },
+    ...LEVELS.map(l => ({ k: 'l' + l, g: cn(l), t: `พิชิต HSK ${l}`, d: `ผ่าน HSK ${l} ครบทุกบท`, ok: () => levelDone(l) })),
+    { k: 's3', g: '勤', t: 'สามวันติด', d: 'เรียนต่อเนื่อง 3 วัน', ok: () => streak() >= 3 },
+    { k: 's7', g: '恒', t: 'หนึ่งสัปดาห์', d: 'เรียนต่อเนื่อง 7 วัน', ok: () => streak() >= 7 },
+    { k: 's30', g: '毅', t: 'หนึ่งเดือน', d: 'เรียนต่อเนื่อง 30 วัน', ok: () => streak() >= 30 },
+    { k: 'w100', g: '百', t: 'ร้อยคำ', d: 'เรียนครบ 100 คำ', ok: () => learnedIds().length >= 100 },
+    { k: 'w1000', g: '千', t: 'พันคำ', d: 'เรียนครบ 1,000 คำ', ok: () => learnedIds().length >= 1000 },
+    { k: 'w3000', g: '万', t: 'สามพันคำ', d: 'เรียนครบ 3,000 คำ', ok: () => learnedIds().length >= 3000 },
+    { k: 'rev', g: '温', t: 'ทบทวนสม่ำเสมอ', d: 'ทบทวนครบ 100 ครั้ง', ok: () => S.counters.reviews >= 100 },
+    { k: 'write', g: '书', t: 'มือนักเขียน', d: 'เขียนถูก 30 ตัวอักษร', ok: () => Object.keys(S.written).length >= 30 },
+    { k: 'perfect', g: '满', t: 'คะแนนเต็ม', d: 'ตอบถูกทุกข้อในแบบทดสอบ', ok: () => S.counters.perfect >= 1 },
+    { k: 'speak', g: '说', t: 'พูดชัด', d: 'พูดถูก 20 คำในโหมดพูดตาม', ok: () => S.counters.spoken >= 20 },
+    { k: 'match', g: '配', t: 'นักจับคู่', d: 'เล่นจับคู่คำครบ 10 เกม', ok: () => S.counters.matches >= 10 },
+    { k: 'stars', g: '藏', t: 'นักสะสม', d: 'บันทึกคำโปรด 20 คำ', ok: () => Object.keys(S.stars).length >= 20 }
+  ];
+  function checkAch() {
+    let changed = false;
+    const got = [];
+    ACH.forEach(a => { if (!S.ach[a.k] && a.ok()) { S.ach[a.k] = Date.now(); changed = true; got.push(a.t); } });
+    if (got.length === 1) toast(`ได้รับตราประทับ “${got[0]}”`);
+    else if (got.length > 1) toast(`ได้รับตราประทับใหม่ ${got.length} อัน ดูได้ในหน้าสถิติ`);
+    if (changed) save();
+  }
+
+  /* ---------- practice hub ---------- */
+  function poolWords() {
+    const p = S.settings.pool;
+    const learned = learnedIds().map(id => W[id]);
+    if (p === 'learned' || (p === 'auto' && learned.length >= 12)) return learned.length >= 6 ? learned : W.filter(w => w.l === 1);
+    const l = p === 'auto' ? Math.max(1, curLevel()) : +p;
+    return W.filter(w => w.l === l);
+  }
+  function poolLabel() {
+    const p = S.settings.pool;
+    if (p === 'learned') return 'คำที่เรียนแล้ว';
+    if (p === 'auto') return learnedIds().length >= 12 ? 'คำที่เรียนแล้ว' : `HSK ${Math.max(1, curLevel())}`;
+    return `HSK ${p}`;
+  }
+  function practiceHead(title, lead) {
+    return `<div class="page-head"><div><div class="crumb"><a href="#/practice">ฝึกฝน</a>${ic('chevron-right', 's16')}<span>${title}</span></div><h1>${title}</h1><p class="lead">${lead}</p></div>
+      <span class="mono muted" style="font-size:13px">แหล่งคำ: ${poolLabel()} · ${fmt(poolWords().length)} คำ</span></div>`;
+  }
+  const fmtTime = ms => { const t = Math.round(ms / 1000); return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`; };
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  function viewPractice() {
+    const missN = Object.keys(S.miss).length, starN = Object.keys(S.stars).length;
+    const cards = [
+      ['match', 'grid-2x2', 'จับคู่คำ', 'จับคู่ตัวจีนกับความหมายให้ไวที่สุด 3 รอบ รอบละ 6 คู่'],
+      ['order', 'list-ordered', 'เรียงประโยค', 'เรียงคำให้เป็นประโยคตามไวยากรณ์ที่เรียนมา แล้วฟังเสียงประโยคจริง'],
+      ['dictation', 'keyboard', 'ฟังแล้วพิมพ์', 'ฟังเสียงแล้วพิมพ์พินอินหรือตัวจีน ไม่ใส่วรรณยุกต์ก็ได้'],
+      ['speak', 'mic', 'พูดตาม', SR ? 'อ่านออกเสียงแล้วให้เบราว์เซอร์ฟังว่าชัดไหม' : 'ฟังแล้วพูดตาม ประเมินตัวเอง (เบราว์เซอร์นี้ฟังเสียงพูดไม่ได้)'],
+      ['mistakes', 'target', 'คำที่ตอบผิดบ่อย', missN ? `${missN} คำที่เคยตอบผิด ตอบถูกแล้วจะค่อยๆ หายไปจากรายการ` : 'ยังไม่มี คำที่ตอบผิดในแบบทดสอบจะมารวมที่นี่'],
+      ['stars', 'star', 'คำที่บันทึกไว้', starN ? `${starN} คำ ฝึกเฉพาะคำที่คุณเลือกเก็บไว้` : 'กดบันทึกที่บัตรคำหรือในคลังคำ แล้วมาฝึกที่นี่'],
+      ['placement', 'gauge', 'วัดระดับ', 'ไล่ถามจาก HSK 1 ขึ้นไป ระดับละ 6 ข้อ เพื่อหาจุดเริ่มที่เหมาะ'],
+      ['sounds', 'audio-lines', 'ฝึกเสียง', 'ตารางพินอิน วรรณยุกต์ และเกมทายเสียง']
+    ];
+    const opts = [['auto', 'อัตโนมัติ'], ['learned', `เรียนแล้ว ${learnedIds().length}`], ...LEVELS.map(l => [String(l), `HSK ${l}`])];
+    app.innerHTML = `<div class="enter">
+      <div class="page-head"><div><h1>ฝึกฝน</h1><p class="lead">เกมและแบบฝึกเสริมจากบทเรียน เลือกแหล่งคำได้ว่าจะฝึกจากคำที่เรียนแล้วหรือระดับไหน</p></div></div>
+      <div class="row wrap" style="margin-bottom:24px;gap:12px"><span class="muted" style="font-size:14px">แหล่งคำ</span><div class="chips" id="pool">${opts.map(([v, t]) => `<button class="chip ${S.settings.pool === v ? 'on' : ''}" data-v="${v}">${t}</button>`).join('')}</div></div>
+      <div class="prac-grid">${cards.map(([k, icon, t, d]) => `<a class="card prac" href="#/${k === 'sounds' ? 'sounds' : 'practice/' + k}"><span class="prac-ic">${ic(icon)}</span><span><b>${t}</b><span>${d}</span></span></a>`).join('')}</div></div>`;
+    $$('#pool .chip').forEach(c => c.onclick = () => { S.settings.pool = c.dataset.v; save(); $$('#pool .chip').forEach(x => x.classList.toggle('on', x === c)); });
+  }
+
+  /* จับคู่คำ */
+  function viewMatch() {
+    app.innerHTML = `<div class="enter">${practiceHead('จับคู่คำ', 'แตะตัวจีน แล้วแตะความหมายที่คู่กัน ทำให้ครบ 3 รอบ')}<div id="mg"></div></div>`;
+    const host = $('#mg');
+    let round = 0, start = 0, miss = 0, timer = null;
+    cleanups.push(() => clearInterval(timer));
+    function intro() {
+      host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp grey">配</div><h2 style="margin-top:24px">พร้อมจับเวลา</h2>
+        <p class="sec" style="margin-top:8px">3 รอบ รอบละ 6 คู่ จับผิดได้ แต่จะนับไว้</p>${S.matchBest ? `<p class="mono muted" style="font-size:13px;margin-top:12px">สถิติดีที่สุด ${fmtTime(S.matchBest)}</p>` : ''}
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่ม${ic('arrow-right')}</button></div></div>`;
+      $('#go', host).onclick = () => { round = 0; miss = 0; start = Date.now(); timer = setInterval(tick, 500); next(); };
+    }
+    function tick() { const t = $('#mt', host); if (t) t.textContent = fmtTime(Date.now() - start); }
+    function next() {
+      if (round === 3) return finish();
+      round++;
+      const seenM = new Set(), seenH = new Set(); const ws = [];
+      for (const w of shuffle(poolWords())) { const m = short(w); if (seenM.has(m) || seenH.has(w.h)) continue; seenM.add(m); seenH.add(w.h); ws.push(w); if (ws.length === 6) break; }
+      const left = shuffle(ws), right = shuffle(ws);
+      host.innerHTML = `<div class="quiz" style="max-width:760px"><div class="q-top"><span class="mono muted" style="font-size:13px">รอบ ${round} / 3</span><div class="bar accent"><i style="width:${pct(round - 1, 3)}%"></i></div><span class="mono" style="font-size:13px" id="mt">${fmtTime(Date.now() - start)}</span></div>
+        <div class="match"><div class="col">${left.map(w => `<button class="tile han-t" data-id="${w.id}" data-side="h"><span class="han">${esc(w.h)}</span></button>`).join('')}</div>
+        <div class="col">${right.map(w => `<button class="tile" data-id="${w.id}" data-side="m">${esc(short(w))}</button>`).join('')}</div></div></div>`;
+      let sel = null, left6 = 6;
+      $$('.tile', host).forEach(b => b.onclick = () => {
+        if (b.classList.contains('done')) return;
+        if (!sel || sel.dataset.side === b.dataset.side) { $$('.tile.sel', host).forEach(x => x.classList.remove('sel')); sel = b; b.classList.add('sel'); if (b.dataset.side === 'h') speak(W[+b.dataset.id].h); return; }
+        if (sel.dataset.id === b.dataset.id) {
+          [sel, b].forEach(x => { x.classList.remove('sel'); x.classList.add('done'); x.disabled = true; });
+          if (b.dataset.side === 'm') speak(W[+b.dataset.id].h);
+          addXP(1); left6--; sel = null;
+          if (!left6) setTimeout(next, 450);
+        } else {
+          miss++; const a = sel; [a, b].forEach(x => x.classList.add('bad')); setTimeout(() => [a, b].forEach(x => x.classList.remove('bad', 'sel')), 450); sel = null;
+        }
+      });
+    }
+    function finish() {
+      clearInterval(timer);
+      const t = Date.now() - start;
+      const best = !S.matchBest || t < S.matchBest;
+      if (best) S.matchBest = t;
+      S.counters.matches++; save(); addXP(5);
+      host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp">配</div><div class="score">${fmtTime(t)}</div>
+        <p class="sec" style="margin-top:8px">${best ? 'สถิติใหม่ · ' : ''}จับผิด ${miss} ครั้ง</p>
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}เล่นอีกครั้ง</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a></div></div>`;
+      $('#again', host).onclick = () => { round = 0; miss = 0; start = Date.now(); timer = setInterval(tick, 500); next(); };
+    }
+    intro();
+  }
+
+  /* เรียงประโยค */
+  const HSET = new Set(W.map(w => w.h));
+  function segment(s) {
+    const out = []; const ch = [...s]; let i = 0;
+    while (i < ch.length) {
+      if (/[，。？！、：；“”,.?!\s]/.test(ch[i])) { i++; continue; }
+      let len = Math.min(4, ch.length - i);
+      for (; len > 1; len--) if (HSET.has(ch.slice(i, i + len).join(''))) break;
+      out.push(ch.slice(i, i + len).join('')); i += len;
+    }
+    return out;
+  }
+  function viewOrder() {
+    const maxL = S.settings.pool === 'auto' || S.settings.pool === 'learned' ? Math.max(1, curLevel()) : +S.settings.pool;
+    const all = [];
+    LEVELS.filter(l => l <= Math.max(2, maxL)).forEach(l => C.grammar[l].forEach(g => g.ex.forEach(e => { const t = segment(e[0]); if (t.length >= 3 && t.length <= 10) all.push({ zh: e[0], py: e[1], th: e[2], t, l, pat: g.t }); })));
+    app.innerHTML = `<div class="enter">${practiceHead('เรียงประโยค', `แตะคำตามลำดับให้เป็นประโยคที่ถูกต้อง มี ${all.length} ประโยคจากไวยากรณ์ HSK 1 ถึง ${Math.max(2, maxL)}`)}<div id="og"></div></div>`;
+    const host = $('#og');
+    const set = pick(all, Math.min(8, all.length));
+    let i = 0, score = 0;
+    function show() {
+      if (i === set.length) {
+        host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp ${score >= set.length * 0.8 ? '' : 'grey'}">句</div><div class="score">${score}/${set.length}</div>
+          <p class="sec" style="margin-top:8px">เรียงถูก ${score} ประโยค</p><div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}ชุดใหม่</button><a class="btn lg" href="#/grammar">ทบทวนไวยากรณ์</a></div></div>`;
+        $('#again', host).onclick = viewOrder; return;
+      }
+      const q = set[i];
+      let bank = shuffle(q.t.map((t, k) => ({ t, k })));
+      if (bank.map(x => x.t).join('') === q.t.join('')) bank = bank.reverse();
+      const placed = [];
+      host.innerHTML = `<div class="quiz"><div class="q-top"><span class="mono muted" style="font-size:13px">${i + 1} / ${set.length}</span><div class="bar accent"><i style="width:${pct(i, set.length)}%"></i></div><span class="mono muted" style="font-size:13px">HSK ${q.l}</span></div>
+        <div class="card q-card"><p class="q-ask">เรียงเป็นประโยคที่แปลว่า</p><p class="q-prompt" style="min-height:0;font-size:20px">${esc(q.th)}</p>
+          <div class="answer" id="ans"></div><div class="bank" id="bank"></div>
+          <div class="q-note" id="onote"><button class="btn ghost" id="hint">${ic('volume-2')}ฟังใบ้</button><button class="btn primary" id="check" disabled>ตรวจคำตอบ</button></div></div></div>`;
+      const render = () => {
+        $('#ans', host).innerHTML = placed.length ? placed.map((x, j) => `<button class="tile han-t sm" data-j="${j}"><span class="han">${esc(x.t)}</span></button>`).join('') : '<span class="muted" style="font-size:14px">แตะคำด้านล่างเพื่อวางที่นี่</span>';
+        $('#bank', host).innerHTML = bank.map((x, j) => `<button class="tile han-t sm" data-b="${j}"><span class="han">${esc(x.t)}</span></button>`).join('');
+        $$('[data-j]', host).forEach(b => b.onclick = () => { bank.push(placed.splice(+b.dataset.j, 1)[0]); render(); });
+        $$('[data-b]', host).forEach(b => b.onclick = () => { placed.push(bank.splice(+b.dataset.b, 1)[0]); render(); });
+        $('#check', host).disabled = bank.length > 0;
+      };
+      render();
+      $('#hint', host).onclick = () => speak(q.zh, 0.75);
+      $('#check', host).onclick = () => {
+        const ok = placed.map(x => x.t).join('') === q.t.join('');
+        if (ok) { score++; addXP(4); }
+        speak(q.zh);
+        $$('#ans .tile', host).forEach(b => { b.disabled = true; b.classList.add(ok ? 'done-ok' : 'bad'); });
+        $('#bank', host).innerHTML = '';
+        $('#onote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(q.zh)}</span><br><span class="muted">${esc(q.py)} · โครงสร้าง ${esc(q.pat)}</span></span><button class="btn primary" id="nx">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'}</button>`;
+        $('#nx', host).onclick = () => { i++; show(); };
+        $('#nx', host).focus();
+      };
+    }
+    show();
+  }
+
+  /* ฟังแล้วพิมพ์ */
+  function viewDictation() {
+    app.innerHTML = `<div class="enter">${practiceHead('ฟังแล้วพิมพ์', 'ฟังเสียงแล้วพิมพ์พินอิน เช่น xuexi หรือ xue2xi2 หรือพิมพ์ตัวจีนก็ได้')}<div id="dg"></div></div>`;
+    const host = $('#dg');
+    const set = pick(poolWords(), 10);
+    let i = 0, score = 0; const wrong = [];
+    function show() {
+      if (i === set.length) {
+        host.innerHTML = resultHTML({ score, total: set.length, wrong }, { passed: score >= 8, glyph: '听', title: 'ฟังแล้วพิมพ์', actions: `<button class="btn red lg" id="again">${ic('refresh-cw')}ชุดใหม่</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a>` });
+        bindSay(host); $('#again', host).onclick = viewDictation; return;
+      }
+      const w = set[i];
+      host.innerHTML = `<div class="quiz"><div class="q-top"><span class="mono muted" style="font-size:13px">${i + 1} / ${set.length}</span><div class="bar accent"><i style="width:${pct(i, set.length)}%"></i></div><span class="mono muted" style="font-size:13px">HSK ${w.l}</span></div>
+        <div class="card q-card"><p class="q-ask">พิมพ์สิ่งที่ได้ยิน</p>
+          <div class="q-prompt"><div class="row" style="gap:12px"><button class="q-play" data-play aria-label="ฟังอีกครั้ง">${ic('volume-2')}</button><button class="btn sm" id="slow">ช้าลง</button></div><p class="muted" id="hintm" style="font-size:14px;min-height:22px"></p></div>
+          <form id="df" class="row" style="margin-top:16px" autocomplete="off"><input class="field" id="din" placeholder="พินอินหรือตัวจีน" autocapitalize="off" spellcheck="false"><button class="btn primary" type="submit">ตรวจ</button></form>
+          <div class="q-note" id="dnote"><button class="link" id="hint" type="button">ดูความหมายเป็นคำใบ้</button><span></span></div></div></div>`;
+      $('[data-play]', host).onclick = () => speak(w.h);
+      $('#slow', host).onclick = () => speak(w.h, 0.55);
+      $('#hint', host).onclick = () => { $('#hintm', host).textContent = short(w); };
+      setTimeout(() => speak(w.h), 250);
+      const inp = $('#din', host); inp.focus();
+      $('#df', host).onsubmit = e => {
+        e.preventDefault();
+        if (inp.disabled) { i++; show(); return; }
+        const v = inp.value.trim();
+        if (!v) return;
+        const ok = v === w.h || plain(v.replace(/[1-5]/g, '')) === plain(w.p);
+        inp.disabled = true; inp.classList.add(ok ? 'ok' : 'no');
+        if (ok) { score++; addXP(3); if (S.miss[w.id]) { S.miss[w.id]--; if (!S.miss[w.id]) delete S.miss[w.id]; } } else { wrong.push(w); S.miss[w.id] = (S.miss[w.id] || 0) + 1; }
+        save();
+        $('#dnote', host).innerHTML = `<span>${ok ? '<b class="ok">ถูกต้อง</b>' : '<b class="no">ยังไม่ใช่</b>'} <span class="han" style="font-size:20px">${esc(w.h)}</span> <span class="sec">${esc(w.p)}</span> <span class="muted">· ${esc(short(w))}</span></span><button class="btn primary" id="nx" type="button">${i + 1 < set.length ? 'ข้อต่อไป' : 'ดูผล'} <kbd style="background:transparent;color:inherit;border-color:currentColor;opacity:.6">Enter</kbd></button>`;
+        $('#nx', host).onclick = () => { i++; show(); };
+        $('#nx', host).focus();
+      };
+    }
+    show();
+  }
+
+  /* พูดตาม */
+  function viewSpeak() {
+    app.innerHTML = `<div class="enter">${practiceHead('พูดตาม', SR ? 'ฟังตัวอย่าง แล้วกดไมค์พูดคำนั้น เบราว์เซอร์จะบอกว่าได้ยินว่าอะไร' : 'เบราว์เซอร์นี้ฟังเสียงพูดไม่ได้ ใช้ Chrome หรือ Edge เพื่อให้ตรวจอัตโนมัติ ตอนนี้ฝึกแบบประเมินตัวเองได้')}<div id="sg"></div></div>`;
+    const host = $('#sg');
+    const set = pick(poolWords(), 10);
+    const byH = new Map(W.map(w => [w.h, w]));
+    let i = 0, score = 0; const wrong = []; let rec = null;
+    cleanups.push(() => { try { rec && rec.abort(); } catch (e) { /* ignore */ } });
+    function done(ok) {
+      const w = set[i];
+      if (ok) { score++; S.counters.spoken++; addXP(3); } else wrong.push(w);
+      save();
+      $('#snx', host).hidden = false; $('#snx', host).focus();
+    }
+    function show() {
+      if (i === set.length) {
+        host.innerHTML = resultHTML({ score, total: set.length, wrong }, { passed: score >= 7, glyph: '说', title: 'พูดตาม', actions: `<button class="btn red lg" id="again">${ic('refresh-cw')}ชุดใหม่</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a>` });
+        bindSay(host); $('#again', host).onclick = viewSpeak; return;
+      }
+      const w = set[i];
+      host.innerHTML = `<div class="quiz"><div class="q-top"><span class="mono muted" style="font-size:13px">${i + 1} / ${set.length}</span><div class="bar accent"><i style="width:${pct(i, set.length)}%"></i></div><span class="mono muted" style="font-size:13px">HSK ${w.l}</span></div>
+        <div class="card q-card"><p class="q-ask">อ่านออกเสียงคำนี้</p>
+          <div class="q-prompt"><span class="han">${esc(w.h)}</span><span class="py">${esc(w.p)}</span><span class="muted">${esc(short(w))}</span></div>
+          <div class="row wrap" style="justify-content:center;margin-top:24px">
+            <button class="btn lg" id="ex">${ic('volume-2')}ฟังตัวอย่าง</button>
+            ${SR ? `<button class="btn red lg" id="mic">${ic('mic')}กดแล้วพูด</button>` : `<button class="btn lg" id="self0">ยังไม่ชัด</button><button class="btn red lg" id="self1">พูดได้แล้ว</button>`}
+          </div>
+          <p class="sec" id="heard" style="margin-top:20px;min-height:24px;text-align:center"></p>
+          <div class="row" style="justify-content:flex-end;margin-top:8px"><button class="btn primary" id="snx" hidden>${i + 1 < set.length ? 'คำต่อไป' : 'ดูผล'}</button></div></div></div>`;
+      $('#ex', host).onclick = () => speak(w.h);
+      $('#snx', host).onclick = () => { i++; show(); };
+      if (!SR) {
+        $('#self1', host).onclick = () => { $('#heard', host).textContent = 'บันทึกว่าพูดได้'; $$('#self0,#self1', host).forEach(b => b.disabled = true); done(true); };
+        $('#self0', host).onclick = () => { $('#heard', host).textContent = 'ไม่เป็นไร ฟังตัวอย่างซ้ำแล้วพูดตามอีกที'; $$('#self0,#self1', host).forEach(b => b.disabled = true); done(false); };
+        return;
+      }
+      let tries = 0;
+      $('#mic', host).onclick = () => {
+        const btn = $('#mic', host);
+        if (hasTTS) speechSynthesis.cancel();
+        rec = new SR(); rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 5;
+        btn.disabled = true; btn.lastChild.textContent = 'กำลังฟัง...';
+        $('#heard', host).textContent = '';
+        rec.onresult = e => {
+          const alts = [...e.results[0]].map(a => a.transcript.replace(/[，。？！,.?!\s]/g, ''));
+          const exact = alts.some(t => t.includes(w.h));
+          const near = !exact && alts.some(t => { const x = byH.get(t); return x && plain(x.p) === plain(w.p); });
+          tries++;
+          $('#heard', host).innerHTML = `ได้ยินว่า <span class="han" style="font-size:22px">${esc(alts[0] || '…')}</span> ${exact ? '<b class="ok" style="color:var(--good)">ชัดเจน</b>' : near ? '<b style="color:var(--good)">เสียงใกล้เคียง</b>' : '<b style="color:var(--bad)">ยังไม่ตรง</b>'}`;
+          if (exact || near) done(true);
+          else if (tries >= 3) { done(false); }
+        };
+        rec.onerror = ev => { $('#heard', host).textContent = ev.error === 'not-allowed' ? 'ต้องอนุญาตให้ใช้ไมโครโฟนก่อน' : 'ไม่ได้ยินเสียง ลองอีกครั้ง'; };
+        rec.onend = () => { btn.disabled = false; btn.lastChild.textContent = tries ? 'พูดอีกครั้ง' : 'กดแล้วพูด'; };
+        try { rec.start(); } catch (err) { btn.disabled = false; }
+      };
+    }
+    show();
+  }
+
+  /* คำผิดบ่อย & คำที่บันทึก */
+  function wordListPractice(title, lead, ids, emptyMsg, glyph) {
+    const words = ids.map(id => W[id]).filter(Boolean);
+    app.innerHTML = `<div class="enter">${practiceHead(title, lead)}<div id="lp"></div></div>`;
+    const host = $('#lp');
+    if (!words.length) { host.innerHTML = `<div class="card empty"><div class="stamp grey">${glyph}</div><h2>ยังไม่มีคำ</h2><p>${emptyMsg}</p><div class="row" style="justify-content:center;margin-top:24px"><a class="btn" href="#/practice">กลับไปหน้าฝึกฝน</a></div></div>`; return; }
+    const list = () => `<div class="card pad"><div class="row wrap" style="justify-content:space-between;margin-bottom:12px"><h3>${words.length} คำ</h3><button class="btn red" id="go">${ic('circle-check')}ฝึก ${Math.min(15, Math.max(words.length, 4))} ข้อ</button></div>
+      <div class="wl-grid">${words.map(w => `<button class="wrow" data-word="${w.id}"><span class="han">${esc(w.h)}</span><span style="min-width:0"><div class="t">${esc(short(w))}</div><div class="p">${esc(w.p)}${S.miss[w.id] ? ` · ผิด ${S.miss[w.id]} ครั้ง` : ''}</div></span></button>`).join('')}</div></div>`;
+    host.innerHTML = list();
+    $('#go', host).onclick = () => {
+      const n = Math.min(15, Math.max(words.length, 4));
+      const pool = words.length >= 8 ? words : W.filter(w => w.l === words[0].l);
+      runQuiz(host, wordQuestions(words, n, pool), {
+        label: title, xpEach: 2, onFinish: r => {
+          host.innerHTML = resultHTML(r, { passed: r.score / r.total >= 0.8, glyph, title, actions: `<button class="btn red lg" id="again">${ic('refresh-cw')}ฝึกอีกรอบ</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a>` });
+          bindSay(host); $('#again', host).onclick = () => route();
+        }
+      });
+    };
+  }
+  const viewMistakes = () => wordListPractice('คำที่ตอบผิดบ่อย', 'ทุกครั้งที่ตอบผิดจะนับไว้ ตอบถูกแล้วตัวนับจะลดลงจนหายไป',
+    Object.keys(S.miss).map(Number).sort((a, b) => S.miss[b] - S.miss[a]).slice(0, 60), 'คำที่ตอบผิดในแบบทดสอบ ฟังแล้วพิมพ์ หรือทบทวน จะถูกรวบรวมไว้ที่นี่', '错');
+  const viewStars = () => wordListPractice('คำที่บันทึกไว้', 'คำที่คุณกดบันทึกจากบัตรคำ คำประจำวัน หรือคลังคำ',
+    Object.keys(S.stars).map(Number).sort((a, b) => S.stars[b] - S.stars[a]), 'กดปุ่มบันทึกที่บัตรคำหรือในคลังคำ แล้วคำนั้นจะมาอยู่ที่นี่', '藏');
+
+  /* วัดระดับ */
+  function viewPlacement() {
+    app.innerHTML = `<div class="enter"><div class="page-head"><div><div class="crumb"><a href="#/practice">ฝึกฝน</a>${ic('chevron-right', 's16')}<span>วัดระดับ</span></div><h1>วัดระดับ</h1>
+      <p class="lead">ถามระดับละ 6 ข้อ เริ่มจาก HSK 1 ถ้าตอบถูก 5 ข้อขึ้นไปจะขยับไประดับถัดไป จนกว่าจะเจอระดับที่ยังไม่แม่น</p></div></div><div id="pg"></div></div>`;
+    const host = $('#pg');
+    const scores = {};
+    function intro() {
+      host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp grey">${ic('gauge')}</div><h2 style="margin-top:24px">ใช้เวลาราว 3–8 นาที</h2>
+        <p class="sec" style="margin-top:8px">ตอบตามที่รู้จริง ไม่รู้ให้เดาน้อยที่สุด ผลจะแนะนำว่าควรเริ่มเรียนที่ระดับไหน</p>
+        <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="go">เริ่มวัดระดับ${ic('arrow-right')}</button></div></div>`;
+      $('#go', host).onclick = () => level(1);
+    }
+    function level(l) {
+      const pool = W.filter(w => w.l === l);
+      const qs = pick(pool, 6).map((w, k) => makeQ(w, k % 2 ? 'hanzi' : 'meaning', pool));
+      runQuiz(host, qs, {
+        label: `HSK ${l}`, xpEach: 1, onFinish: r => {
+          scores[l] = r.score;
+          if (r.score >= 5 && l < 6) {
+            host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp">${cn(l)}</div><h2 style="margin-top:24px">ผ่าน HSK ${l} (${r.score}/6)</h2><p class="sec" style="margin-top:8px">ไปต่อที่ HSK ${l + 1}</p>
+              <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="nx">ไปต่อ${ic('arrow-right')}</button><button class="btn lg" id="stop">พอแค่นี้</button></div></div>`;
+            $('#nx', host).onclick = () => level(l + 1); $('#stop', host).onclick = () => result(l);
+          } else result(r.score >= 5 ? l : l - 1);
+        }
+      });
+    }
+    function result(passed) {
+      const start = Math.min(6, passed + 1);
+      host.innerHTML = `<div class="card result" style="max-width:600px;margin:0 auto"><div class="stamp ${passed ? '' : 'grey'}">${passed ? cn(passed) : '基'}</div>
+        <h2 style="margin-top:24px">${passed ? `คุณผ่านระดับ HSK ${passed}` : 'แนะนำให้เริ่มจากฐาน'}</h2>
+        <p class="sec" style="margin-top:8px">${passed ? `${passed === 6 ? 'ฝีมือระดับสูงสุดแล้ว ฝึกคำ HSK 6 ต่อให้แน่น' : `แนะนำให้เริ่มเรียนที่ HSK ${start}`}` : 'เรียนวรรณยุกต์และพินอินก่อน แล้วเข้าสู่ HSK 1'}</p>
+        <div class="row wrap mono muted" style="justify-content:center;gap:16px;margin-top:16px;font-size:13px">${Object.entries(scores).map(([l, s]) => `<span>HSK ${l}: ${s}/6</span>`).join('')}</div>
+        <div class="row wrap" style="justify-content:center;margin-top:24px">
+          ${passed ? `<button class="btn red lg" id="skip">ประทับตรา HSK 1–${passed} แล้วไป HSK ${start}</button>` : `<a class="btn red lg" href="#/base/tones">เริ่มที่ฐาน${ic('arrow-right')}</a>`}
+          ${passed ? `<a class="btn lg" href="#/test/${passed}">สอบเต็มของ HSK ${passed} ก่อน</a>` : ''}</div>
+        ${passed ? '<p class="muted" style="font-size:13px;margin-top:16px">การประทับตราจะปลดล็อกบทเรียนให้ทันที แต่ไม่เพิ่มคำเหล่านั้นเข้าการทบทวน</p>' : ''}</div>`;
+      const sk = $('#skip', host);
+      if (sk) sk.onclick = () => {
+        for (let l = 1; l <= passed; l++) {
+          S.tests[l] = S.tests[l] && S.tests[l].passed ? S.tests[l] : { passed: true, best: pct(scores[l] || 5, 6), viaPlacement: true };
+          UNITS[l].forEach(u => { if (!unitDone(u.key)) S.units[u.key] = { done: true, best: 0, at: Date.now(), viaPlacement: true }; });
+        }
+        BASE.forEach(b => { if (!S.base[b.key]) S.base[b.key] = { done: true, best: 0, viaPlacement: true }; });
+        save(); toast(`ประทับตรา HSK 1–${passed} แล้ว`);
+        location.hash = `#/level/${start}`;
+      };
+    }
+    intro();
+  }
+  const PRACTICE_VIEWS = { match: viewMatch, order: viewOrder, dictation: viewDictation, speak: viewSpeak, mistakes: viewMistakes, stars: viewStars, placement: viewPlacement };
 
   /* ---------- theme & boot ---------- */
   function applyTheme() {
