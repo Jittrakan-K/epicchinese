@@ -48,15 +48,70 @@
   const KEY = 'epicchinese.v1';
   const DEF = { units: {}, base: {}, tests: {}, srs: {}, written: {}, stars: {}, miss: {}, ach: {}, counters: { reviews: 0, perfect: 0, spoken: 0, matches: 0 }, xp: 0, days: {}, settings: { pinyin: true, rate: 0.85, goal: 50, theme: 'auto', free: false, pool: 'auto' } };
   const clone = o => JSON.parse(JSON.stringify(o));
+  const GUEST = 'epicchinese.guest';
+  const normalize = s => Object.assign(clone(DEF), s, { settings: Object.assign(clone(DEF.settings), s.settings || {}), counters: Object.assign(clone(DEF.counters), s.counters || {}) });
   function load() {
     try {
       const s = JSON.parse(localStorage.getItem(KEY));
-      if (s && typeof s === 'object') return Object.assign(clone(DEF), s, { settings: Object.assign(clone(DEF.settings), s.settings || {}), counters: Object.assign(clone(DEF.counters), s.counters || {}) });
+      if (s && typeof s === 'object') return normalize(s);
     } catch (e) { /* ignore */ }
     return clone(DEF);
   }
   let S = load();
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage full or blocked */ } };
+  const writeLocal = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage full or blocked */ } };
+  const save = () => { S.updatedAt = Date.now(); writeLocal(); schedulePush(); };
+
+  /* ---------- account sync (Firebase, js/cloud.js) ---------- */
+  const cloud = () => window.EpicCloud;
+  let pushT = null, syncing = false, lastSync = 0, syncErr = '', knownUid = null, pendingCarry = null;
+  function schedulePush() {
+    const c = cloud(); if (!c || !c.user || syncing) return;
+    clearTimeout(pushT); pushT = setTimeout(pushNow, 1500);
+  }
+  async function pushNow() {
+    const c = cloud(); clearTimeout(pushT); pushT = null;
+    if (!c || !c.user) return;
+    try { await c.save(S); lastSync = Date.now(); syncErr = ''; } catch (e) { syncErr = 'push'; }
+    renderMeta();
+  }
+  const backupGuest = () => { try { localStorage.setItem(GUEST, JSON.stringify(S)); } catch (e) { /* ignore */ } };
+  function restoreGuest() {
+    let g = null; try { g = JSON.parse(localStorage.getItem(GUEST)); } catch (e) { /* ignore */ }
+    S = g ? normalize(g) : clone(DEF); delete S.owner;
+    writeLocal(); applyTheme();
+  }
+  async function pullFor(u) {
+    syncing = true; renderMeta();
+    try {
+      const remote = await cloud().load();
+      if (remote) {
+        const theirs = S.owner !== u.uid;
+        if (theirs || (remote.updatedAt || 0) > (S.updatedAt || 0)) {
+          if (!S.owner) backupGuest();
+          S = normalize(remote.state); S.owner = u.uid;
+        } else await cloud().save(S);
+      } else {
+        if (S.owner && S.owner !== u.uid) S = clone(DEF);
+        else if (pendingCarry === false) { if (!S.owner) backupGuest(); S = clone(DEF); }
+        else if (!S.owner) backupGuest();
+        S.owner = u.uid; S.updatedAt = Date.now();
+        await cloud().save(S);
+      }
+      lastSync = Date.now(); syncErr = '';
+      writeLocal(); applyTheme(); route();
+    } catch (e) { syncErr = 'pull'; toast('ซิงก์ข้อมูลไม่สำเร็จ ลองใหม่อีกครั้ง'); }
+    syncing = false; pendingCarry = null; renderMeta();
+  }
+  window.addEventListener('cloud-change', () => {
+    const c = cloud(); const u = c.user;
+    if (u && u.uid !== knownUid) { knownUid = u.uid; pullFor(u); }
+    else if (!u) {
+      knownUid = null;
+      if (c.configured && S.owner) { restoreGuest(); route(); }
+    }
+    renderMeta();
+  });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && pushT) pushNow(); });
 
   function addXP(n) {
     S.xp += n;
@@ -216,8 +271,11 @@
     checkAch();
     const st = streak(); const t = todayXP(); const g = S.settings.goal;
     const el = $('#topmeta'); if (!el) return;
+    const c = cloud(); const u = c && c.user;
     el.innerHTML = `<span class="item" title="วันที่เรียนต่อเนื่อง">${ic('flame', 's16')}<span class="mono">${st} วัน</span></span>
-      <span class="item goal" title="เป้าหมายวันนี้"><span class="mono">${t}/${g} XP</span><span class="goal-bar"><i style="width:${Math.min(100, pct(t, g))}%"></i></span></span>`;
+      <span class="item goal" title="เป้าหมายวันนี้"><span class="mono">${t}/${g} XP</span><span class="goal-bar"><i style="width:${Math.min(100, pct(t, g))}%"></i></span></span>
+      <button class="acct ${u ? 'in' : ''}" id="acct" aria-label="${u ? `บัญชี PIN ${c.pin}` : 'เข้าสู่ระบบ'}">${ic(u ? (syncErr ? 'cloud-off' : 'cloud') : 'user-round', 's16')}<span>${u ? `PIN ${esc(c.pin)}` : 'เข้าสู่ระบบ'}</span></button>`;
+    $('#acct', el).onclick = accountModal;
   }
   function toast(msg) {
     const t = document.createElement('div');
@@ -1233,8 +1291,9 @@
             <div class="set-row"><div><div>ธีม</div><div class="d">กระดาษกลางวัน หรือหมึกกลางคืน</div></div><select id="theme">${[['auto', 'ตามระบบ'], ['light', 'สว่าง'], ['dark', 'มืด']].map(([v, t]) => `<option value="${v}" ${v === S.settings.theme ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
             <div class="set-row"><div><div>ทดสอบเสียง</div><div class="d">${voice ? esc(voice.name) : 'ยังไม่พบเสียงภาษาจีน'}</div></div><button class="btn sm" data-say="你好，欢迎学习汉语">${ic('volume-2', 's16')}ฟัง</button></div>
           </div>
-          <div class="card pad"><h3>ข้อมูลความคืบหน้า</h3><p class="sec" style="font-size:14px;margin-top:4px">เก็บไว้ในเบราว์เซอร์นี้เท่านั้น สำรองไว้ก่อนเปลี่ยนเครื่องหรือล้างข้อมูลเบราว์เซอร์</p>
+          <div class="card pad"><h3>ข้อมูลความคืบหน้า</h3><p class="sec" style="font-size:14px;margin-top:4px">${cloud() && cloud().user ? `บันทึกขึ้นบัญชี PIN ${esc(cloud().pin)} อัตโนมัติ` : 'ตอนนี้เก็บไว้ในเบราว์เซอร์นี้เท่านั้น เข้าสู่ระบบด้วย PIN เพื่อใช้ต่อได้ทุกเครื่อง'}</p>
             <div class="stack" style="gap:8px;margin-top:16px">
+              <button class="btn" id="acct2">${ic(cloud() && cloud().user ? 'cloud' : 'user-round')}${cloud() && cloud().user ? 'จัดการบัญชี' : 'เข้าสู่ระบบด้วย PIN'}</button>
               <button class="btn" id="exp">${ic('download')}ดาวน์โหลดไฟล์สำรอง</button>
               <label class="btn" style="cursor:pointer">${ic('upload')}นำเข้าไฟล์สำรอง<input type="file" accept="application/json" id="imp" hidden></label>
               <button class="btn ghost" id="reset" style="color:var(--bad)">${ic('trash-2')}เริ่มใหม่ทั้งหมด</button>
@@ -1245,6 +1304,7 @@
     $('#rate').oninput = e => { S.settings.rate = +e.target.value; $('#rv').textContent = S.settings.rate.toFixed(2) + '×'; save(); };
     $('#goal').onchange = e => { S.settings.goal = +e.target.value; save(); renderMeta(); };
     $('#theme').onchange = e => { S.settings.theme = e.target.value; save(); applyTheme(); };
+    $('#acct2').onclick = accountModal;
     $('#exp').onclick = () => {
       const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
       const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `epicchinese-${dkey()}.json`; a.click();
@@ -1255,14 +1315,14 @@
       f.text().then(t => {
         const d = JSON.parse(t);
         if (!d || typeof d !== 'object' || !('units' in d)) throw new Error();
-        S = Object.assign(clone(DEF), d, { settings: Object.assign(clone(DEF.settings), d.settings || {}) });
+        const owner = S.owner; S = normalize(d); if (owner) S.owner = owner; else delete S.owner;
         save(); applyTheme(); toast('นำเข้าความคืบหน้าแล้ว'); route();
       }).catch(() => toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของ Epic Chinese'));
     };
     $('#reset').onclick = () => modal(`<h2>เริ่มใหม่ทั้งหมด</h2><p class="sec" style="margin-top:8px">ตราประทับ คะแนน และคำที่รอทบทวนจะหายทั้งหมด ดาวน์โหลดไฟล์สำรองไว้ก่อนถ้าอยากเก็บ</p>
       <div class="row" style="justify-content:flex-end;margin-top:24px"><button class="btn" id="no">ยกเลิก</button><button class="btn red" id="yes">ลบและเริ่มใหม่</button></div>`, (m, close) => {
       $('#no', m).onclick = close;
-      $('#yes', m).onclick = () => { S = clone(DEF); save(); close(); applyTheme(); location.hash = '#/'; route(); toast('เริ่มต้นใหม่แล้ว'); };
+      $('#yes', m).onclick = () => { const owner = S.owner; S = clone(DEF); if (owner) S.owner = owner; save(); close(); applyTheme(); location.hash = '#/'; route(); toast('เริ่มต้นใหม่แล้ว'); };
     });
   }
 
@@ -1646,6 +1706,88 @@
     intro();
   }
   const PRACTICE_VIEWS = { match: viewMatch, order: viewOrder, dictation: viewDictation, speak: viewSpeak, mistakes: viewMistakes, stars: viewStars, placement: viewPlacement };
+
+  /* ---------- account modal ---------- */
+  const AUTH_ERR = {
+    'auth/email-already-in-use': 'PIN นี้มีคนใช้แล้ว ลองเลือก PIN อื่น',
+    'auth/invalid-credential': 'PIN หรือรหัสผ่านไม่ถูกต้อง',
+    'auth/wrong-password': 'PIN หรือรหัสผ่านไม่ถูกต้อง',
+    'auth/user-not-found': 'ไม่พบบัญชีนี้ กดสร้างบัญชีใหม่ได้เลย',
+    'auth/weak-password': 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว',
+    'auth/too-many-requests': 'ลองผิดหลายครั้งเกินไป รอสักครู่แล้วลองใหม่',
+    'auth/network-request-failed': 'เชื่อมต่ออินเทอร์เน็ตไม่ได้',
+    'auth/operation-not-allowed': 'ยังไม่ได้เปิดการเข้าสู่ระบบแบบ Email/Password ใน Firebase',
+    'auth/unauthorized-domain': 'โดเมนนี้ยังไม่ได้รับอนุญาตใน Firebase (Authorized domains)'
+  };
+  const syncText = () => syncing ? 'กำลังซิงก์...' : syncErr ? 'ซิงก์ล่าสุดไม่สำเร็จ' : lastSync ? `ซิงก์แล้วเมื่อ ${new Date(lastSync).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.` : 'พร้อมซิงก์';
+  function accountModal() {
+    const c = cloud();
+    if (!c || !c.configured) {
+      modal(`<div class="stamp grey" style="width:88px;height:88px">${ic('cloud-off')}</div>
+        <h2 style="margin-top:24px;font-size:var(--text-2xl)">ระบบบัญชียังไม่พร้อม</h2>
+        <p class="sec" style="margin-top:8px">${c && c.error ? 'เชื่อมต่อ Firebase ไม่ได้ ตรวจอินเทอร์เน็ตแล้วรีเฟรชหน้าอีกครั้ง' : 'เจ้าของเว็บยังไม่ได้ใส่ค่า Firebase ในไฟล์ js/firebase-config.js ระหว่างนี้ความคืบหน้าบันทึกไว้ในเบราว์เซอร์นี้ตามปกติ'}</p>`);
+      return;
+    }
+    if (c.user) {
+      modal(`<div class="acct-card"><span class="acct-ic">${ic('user-round')}</span><div><p class="muted" style="font-size:var(--text-sm);font-weight:700">บัญชีของคุณ</p><p class="acct-pin">PIN ${esc(c.pin)}</p></div></div>
+        <p class="sec" style="margin-top:20px">ความคืบหน้าบันทึกขึ้นบัญชีอัตโนมัติ เปิดเว็บที่เครื่องไหนแล้วใส่ PIN กับรหัสผ่านเดิม ข้อมูลจะตามมาด้วย</p>
+        <p class="muted" id="ss" style="margin-top:12px;font-size:var(--text-sm);font-weight:700">${syncText()}</p>
+        <div class="row wrap" style="margin-top:24px"><button class="btn" id="snow">${ic('refresh-cw')}ซิงก์ตอนนี้</button><button class="btn" id="out">${ic('log-out')}ออกจากระบบ</button></div>`,
+      (m, close) => {
+        $('#snow', m).onclick = async () => { $('#ss', m).textContent = 'กำลังซิงก์...'; await pushNow(); $('#ss', m).textContent = syncText(); };
+        $('#out', m).onclick = async () => {
+          $('#out', m).disabled = true;
+          if (pushT) await pushNow();
+          await c.signOut();
+          close(); toast('ออกจากระบบแล้ว');
+        };
+      });
+      return;
+    }
+    let mode = 'in';
+    modal(`<h2 style="font-size:var(--text-2xl)">บัญชี Epic Chinese</h2>
+      <p class="sec" style="margin-top:8px">ใช้ PIN กับรหัสผ่านเพื่อเก็บความคืบหน้าไว้บนคลาวด์ แล้วเปิดต่อได้จากทุกเครื่อง</p>
+      <div class="tabs" style="margin-top:20px" id="atabs"><button type="button" data-m="in" class="on">เข้าสู่ระบบ</button><button type="button" data-m="up">สร้างบัญชีใหม่</button></div>
+      <form id="af" class="aform" novalidate>
+        <label>PIN <span class="muted">ตัวเลข 4 ถึง 10 หลัก</span><input class="field" id="apin" inputmode="numeric" autocomplete="username" maxlength="10" pattern="[0-9]*" required></label>
+        <label>รหัสผ่าน <span class="muted">อย่างน้อย 6 ตัว</span><input class="field" id="apw" type="password" autocomplete="current-password" required></label>
+        <label class="only-up" hidden>ยืนยันรหัสผ่าน<input class="field" id="apw2" type="password" autocomplete="new-password"></label>
+        <label class="only-up check" hidden><input type="checkbox" id="acarry" checked> นำความคืบหน้าในเครื่องนี้ไปไว้ในบัญชีใหม่</label>
+        <p class="aerr" id="aerr" role="alert"></p>
+        <button class="btn red lg" id="ago" type="submit">เข้าสู่ระบบ</button>
+      </form>`,
+    (m, close) => {
+      const setMode = md => {
+        mode = md;
+        $$('#atabs button', m).forEach(b => b.classList.toggle('on', b.dataset.m === md));
+        $$('.only-up', m).forEach(x => { x.hidden = md !== 'up'; });
+        $('#apw', m).autocomplete = md === 'up' ? 'new-password' : 'current-password';
+        $('#ago', m).textContent = md === 'up' ? 'สร้างบัญชี' : 'เข้าสู่ระบบ';
+        $('#aerr', m).textContent = '';
+      };
+      $$('#atabs button', m).forEach(b => b.onclick = () => setMode(b.dataset.m));
+      $('#apin', m).addEventListener('input', e => { e.target.value = e.target.value.replace(/\D/g, ''); });
+      setTimeout(() => $('#apin', m).focus(), 50);
+      $('#af', m).onsubmit = async e => {
+        e.preventDefault();
+        const pin = $('#apin', m).value.trim(), pw = $('#apw', m).value;
+        const err = t => { $('#aerr', m).textContent = t; };
+        if (!/^\d{4,10}$/.test(pin)) return err('PIN ต้องเป็นตัวเลข 4 ถึง 10 หลัก');
+        if (pw.length < 6) return err('รหัสผ่านต้องยาวอย่างน้อย 6 ตัว');
+        if (mode === 'up' && pw !== $('#apw2', m).value) return err('ยืนยันรหัสผ่านไม่ตรงกัน');
+        const go = $('#ago', m); go.disabled = true; go.textContent = 'กำลังตรวจสอบ...';
+        try {
+          if (mode === 'up') { pendingCarry = $('#acarry', m).checked; await c.signUp(pin, pw); }
+          else { pendingCarry = null; await c.signIn(pin, pw); }
+          close(); toast(mode === 'up' ? `สร้างบัญชี PIN ${pin} แล้ว` : `เข้าสู่ระบบ PIN ${pin} แล้ว`);
+        } catch (ex) {
+          pendingCarry = null;
+          err(AUTH_ERR[ex.code] || 'ทำรายการไม่สำเร็จ ลองใหม่อีกครั้ง');
+          go.disabled = false; go.textContent = mode === 'up' ? 'สร้างบัญชี' : 'เข้าสู่ระบบ';
+        }
+      };
+    });
+  }
 
   /* ---------- theme & boot ---------- */
   function applyTheme() {

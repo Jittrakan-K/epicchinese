@@ -24,7 +24,20 @@
 - **สถิติ** วันต่อเนื่อง XP เป้าหมายรายวัน กราฟกิจกรรม ตราประทับความสำเร็จ 20 แบบ ส่งออก/นำเข้าความคืบหน้า ธีมสว่างและมืด
 - ใช้งานออฟไลน์ได้ (PWA) และรองรับมือถือ
 
-ความคืบหน้าทั้งหมดเก็บใน `localStorage` ของเบราว์เซอร์ ไม่มีเซิร์ฟเวอร์ ไม่ต้องสมัครสมาชิก
+ถ้ายังไม่เข้าสู่ระบบ ความคืบหน้าจะเก็บใน `localStorage` ของเบราว์เซอร์ ถ้าเข้าสู่ระบบด้วย **PIN + รหัสผ่าน** ความคืบหน้าจะซิงก์ขึ้น Firebase และเปิดต่อได้จากทุกเครื่อง
+
+## เปิดระบบบัญชี (Firebase)
+
+1. สร้างโปรเจกต์ที่ [Firebase Console](https://console.firebase.google.com)
+2. **Build → Authentication → Get started → Sign-in method** เปิด **Email/Password**
+3. **Build → Firestore Database → Create database** (production mode) แล้วไปที่แท็บ **Rules** วางเนื้อหาจากไฟล์ `firestore.rules` แล้วกด Publish
+4. **Project settings → General → Your apps** กดไอคอน `</>` เพื่อเพิ่มเว็บแอป แล้วคัดลอก `firebaseConfig`
+5. วางค่าใน `js/firebase-config.js` แทน `null` แล้ว commit ขึ้น GitHub
+6. **Authentication → Settings → Authorized domains** เพิ่ม `jittrakan-k.github.io`
+
+วิธีทำงาน: PIN ถูกแปลงเป็นอีเมลภายใน (`1234@pin.epicchinese.app`) เพื่อใช้ Firebase Authentication แบบ Email/Password ความคืบหน้าเก็บที่ `progress/{uid}` ใน Firestore และกฎอนุญาตให้อ่านเขียนได้เฉพาะเจ้าของบัญชี ค่าใน `firebase-config.js` เปิดเผยได้ ความปลอดภัยมาจากกฎ Firestore
+
+ลืมรหัสผ่าน: ระบบนี้ไม่มีอีเมลจริงให้รีเซ็ต เจ้าของเว็บลบผู้ใช้ได้ที่ Authentication → Users แล้วให้สร้างบัญชีใหม่ด้วย PIN เดิม
 
 ## เปิดบน GitHub Pages
 
@@ -55,6 +68,9 @@ python3 -m http.server 8000
 index.html            หน้าเดียว (SPA ใช้ hash routing)
 css/style.css         ดีไซน์ทั้งหมด
 js/app.js             ตรรกะของแอป
+js/cloud.js           ระบบบัญชีและซิงก์กับ Firebase
+js/firebase-config.js ค่าตั้งค่า Firebase ของโปรเจกต์
+firestore.rules       กฎความปลอดภัยของ Firestore
 js/data-words.js      คำศัพท์ HSK 1–6
 js/data-content.js    วรรณยุกต์ พินอิน ขีด หมวดนำ ไวยากรณ์
 js/icons.js           ไอคอน (Lucide)

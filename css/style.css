@@ -1,5 +1,5 @@
 /* Hallmark · shape: Stage hero over a fact bento, the level path and a row of stuck-down level cards · genre: playful · theme: Sticker (by request) · redesign: full
- * hero: Stage · nav: slab bar in ink, the wordmark, the destinations and the day's streak and XP · footer: ink band with the wordmark over the credits · imagery: the roadmap map, drawn from the learner's own progress · signature: the ink-wash mountain map as a die-cut sticker, a stamp on every station passed · sticker: sheet, palette swapped to the user's paper, ink, vermilion and ink-wash greys
+ * hero: Stage · nav: slab bar in ink, the round mark alone, the destinations, the day's streak and XP and the account pill · footer: ink band with the wordmark over the credits · imagery: the roadmap map, drawn from the learner's own progress · signature: the ink-wash mountain map as a die-cut sticker, a stamp on every station passed · sticker: sheet, palette swapped to the user's paper, ink, vermilion and ink-wash greys
  * axes: light/display-heavy/chromatic-vermilion · posture: full-palette · contrast: pass · fold: pass · v2.0.0 */
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R4 V4 · weakest: P, a study tool argues less than a shop; leaned on the stamp-per-station map so progress itself is the loud thing */
 /* Hallmark · waive 37 · Bowlby One SC and Sofia Sans carry no Thai or hanzi glyphs · Kanit, IBM Plex Sans Thai and LXGW WenKai stand behind them for Thai headings, Thai body and the Chinese characters this course teaches */
@@ -55,6 +55,30 @@ p { margin: 0; }
 .mark-ring { fill: none; stroke: var(--color-accent-ink); stroke-width: 6.5; }
 .mark-bar { fill: var(--color-accent-ink); }
 .foot .mark { width: 44px; height: 44px; }
+.logo-mark { width: 44px; height: 44px; justify-content: center; border-radius: 50%; flex: none; transition: transform var(--dur-micro) var(--ease-out); }
+.logo-mark .mark { width: 40px; height: 40px; }
+.logo-mark:hover { transform: rotate(-8deg); }
+.acct {
+  height: 36px; padding: 0 var(--space-sm); border-radius: var(--radius-pill); border: 0; cursor: pointer;
+  display: inline-flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); font-weight: 700;
+  background: transparent; color: var(--color-bar-ink); box-shadow: inset 0 0 0 2px var(--color-bar-muted);
+  transition: background-color var(--dur-micro) var(--ease-out);
+}
+.acct:hover { background: var(--color-bar-2); }
+.acct.in { background: var(--color-accent); box-shadow: 0 0 0 2px var(--color-white); color: var(--color-accent-ink); }
+.acct.in:hover { background: var(--color-accent-deep); }
+.aform { display: flex; flex-direction: column; gap: var(--space-md); margin-top: var(--space-lg); }
+.aform label { display: flex; flex-direction: column; gap: var(--space-2xs); font-size: var(--text-sm); font-weight: 700; }
+.aform label .muted { font-weight: 400; }
+.aform label.check { flex-direction: row; align-items: center; gap: var(--space-xs); font-weight: 400; }
+.aform input[type='checkbox'] { width: 20px; height: 20px; accent-color: var(--color-accent); }
+.aform .btn { align-self: flex-start; }
+.aform .field { flex: none; width: 100%; }
+.aerr { min-height: 1.5em; color: var(--color-bad); font-size: var(--text-sm); font-weight: 700; }
+.acct-card { display: flex; align-items: center; gap: var(--space-md); }
+.acct-ic { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--color-accent); color: var(--color-accent-ink); border: 4px solid var(--color-white); box-shadow: var(--shadow-tag); flex: none; }
+.acct-ic .icon { width: 28px; height: 28px; }
+.acct-pin { font-family: var(--font-display); font-weight: var(--display-weight); font-size: var(--text-2xl); line-height: 1.1; }
 .nav { display: flex; gap: var(--space-2xs); }
 .nav a {
   height: 40px; padding: 0 var(--space-md); display: flex; align-items: center; gap: var(--space-xs); border-radius: var(--radius-pill);
@@ -503,6 +527,7 @@ select { height: 40px; border-radius: var(--radius-pill); border: 0; box-shadow:
   .top-in { height: 56px; padding: 0 var(--space-md); gap: var(--space-md); }
   .nav { display: none; }
   .top-meta .goal { display: none; }
+  .top-meta { gap: var(--space-sm); }
   main { padding: var(--space-lg) var(--space-md) 112px; }
   .band-in { padding: 0 var(--space-md); }
   .tabbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-sticky); background: var(--color-bar); padding: var(--space-2xs) var(--space-2xs) calc(var(--space-2xs) + env(safe-area-inset-bottom)); }
