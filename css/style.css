@@ -50,6 +50,11 @@ p { margin: 0; }
 .top-in { max-width: var(--container); margin: 0 auto; height: 64px; padding: 0 var(--space-xl); display: flex; align-items: center; gap: var(--space-xl); }
 .logo { display: flex; align-items: center; gap: var(--space-sm); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: var(--tracking-display); color: var(--color-bar-ink); white-space: nowrap; }
 .seal { width: 32px; height: 32px; border-radius: var(--r-s); background: var(--color-accent); color: var(--color-accent-ink); display: grid; place-items: center; font-family: var(--font-outlier); font-size: var(--text-lg); line-height: 1; border: 3px solid var(--color-white); transform: rotate(-6deg); flex: none; }
+.mark { width: 34px; height: 34px; flex: none; border-radius: 50%; box-shadow: 0 0 0 3px var(--color-white); }
+.mark-bg { fill: var(--color-accent); }
+.mark-ring { fill: none; stroke: var(--color-accent-ink); stroke-width: 6.5; }
+.mark-bar { fill: var(--color-accent-ink); }
+.foot .mark { width: 44px; height: 44px; }
 .nav { display: flex; gap: var(--space-2xs); }
 .nav a {
   height: 40px; padding: 0 var(--space-md); display: flex; align-items: center; gap: var(--space-xs); border-radius: var(--radius-pill);
