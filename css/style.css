@@ -50,14 +50,12 @@ p { margin: 0; }
 .top-in { max-width: var(--container); margin: 0 auto; height: 64px; padding: 0 var(--space-xl); display: flex; align-items: center; gap: var(--space-xl); }
 .logo { display: flex; align-items: center; gap: var(--space-sm); font-family: var(--font-display); font-size: var(--text-lg); letter-spacing: var(--tracking-display); color: var(--color-bar-ink); white-space: nowrap; }
 .seal { width: 32px; height: 32px; border-radius: var(--r-s); background: var(--color-accent); color: var(--color-accent-ink); display: grid; place-items: center; font-family: var(--font-outlier); font-size: var(--text-lg); line-height: 1; border: 3px solid var(--color-white); transform: rotate(-6deg); flex: none; }
-.mark { width: 34px; height: 34px; flex: none; border-radius: 50%; box-shadow: 0 0 0 3px var(--color-white); }
-.mark-bg { fill: var(--color-accent); }
-.mark-ring { fill: none; stroke: var(--color-accent-ink); stroke-width: 6.5; }
-.mark-bar { fill: var(--color-accent-ink); }
+.mark { width: 36px; height: 36px; flex: none; overflow: visible; }
+.mark-g { fill: var(--color-accent); stroke: var(--color-white); stroke-width: 4; stroke-linejoin: round; paint-order: stroke; }
 .foot .mark { width: 44px; height: 44px; }
-.logo-mark { width: 44px; height: 44px; justify-content: center; border-radius: 50%; flex: none; transition: transform var(--dur-micro) var(--ease-out); }
-.logo-mark .mark { width: 40px; height: 40px; }
-.logo-mark:hover { transform: rotate(-8deg); }
+.logo-mark { width: 48px; height: 48px; justify-content: center; border-radius: var(--r-s); flex: none; transition: transform var(--dur-micro) var(--ease-out); }
+.logo-mark .mark { width: 44px; height: 44px; }
+.logo-mark:hover { transform: rotate(-6deg); }
 .acct {
   height: 36px; padding: 0 var(--space-sm); border-radius: var(--radius-pill); border: 0; cursor: pointer;
   display: inline-flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); font-weight: 700;
@@ -499,7 +497,7 @@ select { height: 40px; border-radius: var(--radius-pill); border: 0; box-shadow:
 /* ---------- footer: the ink band ---------- */
 .foot { background: var(--color-bar); color: var(--color-bar-ink); margin-top: var(--space-3xl); }
 .foot-in { max-width: var(--container); margin: 0 auto; padding: var(--space-2xl) var(--space-xl) var(--space-3xl); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-lg); align-items: start; }
-.foot .logo { font-size: var(--text-2xl); }
+.foot .logo { font-size: var(--text-2xl); text-decoration: none; }
 .foot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-xs); font-size: var(--text-sm); color: var(--color-bar-muted); }
 .foot a { color: var(--color-bar-ink); text-decoration: underline; text-decoration-color: var(--color-wash); text-underline-offset: 3px; }
 .foot a:hover { text-decoration-color: var(--color-accent); }
