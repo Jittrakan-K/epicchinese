@@ -1,4 +1,4 @@
-/* Hanzi Trail — แอปเรียนภาษาจีนจากศูนย์ถึง HSK 6
+/* Panda Pinyin — แอปเรียนภาษาจีนจากศูนย์ถึง HSK 6
    ไม่มี build step: เปิด index.html ได้เลย หรือวางบน GitHub Pages */
 (() => {
   'use strict';
@@ -1307,7 +1307,7 @@
     $('#acct2').onclick = accountModal;
     $('#exp').onclick = () => {
       const blob = new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' });
-      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `hanzi-trail-${dkey()}.json`; a.click();
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `panda-pinyin-${dkey()}.json`; a.click();
       setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     };
     $('#imp').onchange = e => {
@@ -1317,7 +1317,7 @@
         if (!d || typeof d !== 'object' || !('units' in d)) throw new Error();
         const owner = S.owner; S = normalize(d); if (owner) S.owner = owner; else delete S.owner;
         save(); applyTheme(); toast('นำเข้าความคืบหน้าแล้ว'); route();
-      }).catch(() => toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของ Hanzi Trail'));
+      }).catch(() => toast('ไฟล์นี้ไม่ใช่ไฟล์สำรองของ Panda Pinyin'));
     };
     $('#reset').onclick = () => modal(`<h2>เริ่มใหม่ทั้งหมด</h2><p class="sec" style="margin-top:8px">ตราประทับ คะแนน และคำที่รอทบทวนจะหายทั้งหมด ดาวน์โหลดไฟล์สำรองไว้ก่อนถ้าอยากเก็บ</p>
       <div class="row" style="justify-content:flex-end;margin-top:24px"><button class="btn" id="no">ยกเลิก</button><button class="btn red" id="yes">ลบและเริ่มใหม่</button></div>`, (m, close) => {
@@ -1745,7 +1745,7 @@
       return;
     }
     let mode = 'in';
-    modal(`<h2 style="font-size:var(--text-2xl)">บัญชี Hanzi Trail</h2>
+    modal(`<h2 style="font-size:var(--text-2xl)">บัญชี Panda Pinyin</h2>
       <p class="sec" style="margin-top:8px">ใช้ PIN กับรหัสผ่านเพื่อเก็บความคืบหน้าไว้บนคลาวด์ แล้วเปิดต่อได้จากทุกเครื่อง</p>
       <div class="tabs" style="margin-top:20px" id="atabs"><button type="button" data-m="in" class="on">เข้าสู่ระบบ</button><button type="button" data-m="up">สร้างบัญชีใหม่</button></div>
       <form id="af" class="aform" novalidate>
