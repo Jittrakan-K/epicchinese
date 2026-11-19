@@ -13,6 +13,7 @@
   --color-ink: oklch(22.5% 0.011 73); --color-ink-2: oklch(30% 0.013 75); --color-muted: oklch(47% 0.021 73);
   --color-rule: oklch(84% 0.022 80); --color-white: oklch(99.5% 0.003 85); --color-shadow: oklch(22.5% 0.011 73);
   --color-accent: oklch(53.1% 0.165 30); --color-accent-deep: oklch(46% 0.15 30); --color-accent-2: oklch(82.4% 0.029 81); --color-slot: oklch(93.6% 0.015 81);
+  --color-seal: #cd252d; /* สีโลโก้ ตราประทับ 中 */
   --color-wash: oklch(69.7% 0.033 82); --color-wash-2: oklch(88.5% 0.02 83);
   --color-accent-ink: oklch(99.5% 0.003 85); --color-focus: oklch(53.1% 0.165 30);
   --color-bar: oklch(22.5% 0.011 73); --color-bar-ink: oklch(96.8% 0.009 85); --color-bar-2: oklch(30% 0.013 75); --color-bar-muted: oklch(80% 0.02 82);
