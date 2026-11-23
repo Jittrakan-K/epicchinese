@@ -558,3 +558,33 @@ select { height: 40px; border-radius: var(--radius-pill); border: 0; box-shadow:
   .tile { padding: var(--space-xs) var(--space-sm); font-size: var(--text-sm); }
   .foot-in { grid-template-columns: minmax(0, 1fr); padding-bottom: 120px; }
 }
+
+/* ---------- ประโยคตัวอย่าง ที่มาของอักษร และแบบฝึกชุดใหม่ ---------- */
+.sent { font-family: var(--font-outlier); font-size: var(--text-xl); line-height: 2.1; overflow-wrap: anywhere; }
+.sent ruby { ruby-position: over; }
+.sent rt { font-family: var(--font-body); font-size: 0.5em; color: var(--color-muted); letter-spacing: 0; }
+.sent .tk { border-radius: 6px; padding: 0 1px; }
+.sent .tk.kn { cursor: pointer; text-decoration: underline dotted var(--color-rule); text-underline-offset: 6px; }
+.sent .tk[data-entry] { cursor: pointer; }
+.sent .tk:hover { background: var(--color-slot); }
+.sent .blank { color: var(--color-accent); letter-spacing: 0.1em; }
+.sent-q { text-align: center; }
+.sent-q.big .sent { font-size: var(--text-2xl); }
+.ex-list { display: flex; flex-direction: column; gap: var(--space-sm); }
+.ex-row { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-xs); align-items: start; text-align: left; }
+.ex-row .sent { font-size: var(--text-lg); line-height: 2; }
+.mx-h { font-size: var(--text-lg); margin: var(--space-lg) 0 var(--space-sm); }
+.parts { display: flex; flex-direction: column; gap: var(--space-sm); }
+.part { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-md); align-items: start; padding: var(--space-sm) var(--space-md); border-radius: var(--r-m); background: var(--color-slot); }
+.part .han.big { font-size: 2.5rem; line-height: 1.1; }
+.card-ex { width: 100%; margin-top: var(--space-md); }
+.card-ex:empty { display: none; }
+.tr-line { margin-top: var(--space-md); font-size: var(--text-lg); text-align: center; }
+.qn-x { display: inline-block; }
+.qn-x .sent { font-size: var(--text-lg); line-height: 2; }
+.prac-h { font-size: var(--text-xl); margin: var(--space-xl) 0 var(--space-md); }
+.full-cta { display: flex; align-items: center; justify-content: space-between; gap: var(--space-lg); flex-wrap: wrap; margin-top: var(--space-xl); }
+.blitz .q-prompt .han { font-size: 4.5rem; }
+.blitz.shake { animation: shake 260ms var(--ease-out); }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .blitz.shake { animation: none; } }
