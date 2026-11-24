@@ -60,7 +60,7 @@
 
   /* ---------- store ---------- */
   const KEY = 'epicchinese.v1';
-  const DEF = { units: {}, base: {}, tests: {}, srs: {}, written: {}, stars: {}, miss: {}, ach: {}, counters: { reviews: 0, perfect: 0, spoken: 0, matches: 0 }, xp: 0, days: {}, settings: { pinyin: true, rate: 0.85, goal: 50, theme: 'auto', free: false, pool: 'auto' } };
+  const DEF = { units: {}, base: {}, tests: {}, srs: {}, sp: {}, written: {}, stars: {}, miss: {}, ach: {}, counters: { reviews: 0, perfect: 0, spoken: 0, matches: 0 }, xp: 0, days: {}, settings: { pinyin: true, rate: 0.85, goal: 50, theme: 'auto', free: false, pool: 'auto' } };
   const clone = o => JSON.parse(JSON.stringify(o));
   const GUEST = 'epicchinese.guest';
   const normalize = s => Object.assign(clone(DEF), s, { settings: Object.assign(clone(DEF.settings), s.settings || {}), counters: Object.assign(clone(DEF.counters), s.counters || {}) });
@@ -267,7 +267,7 @@
   const app = $('#app');
   const NAV = [
     ['/', 'map', 'แผนที่'], ['/review', 'rotate-ccw', 'ทบทวน'], ['/dict', 'book-open', 'คลังคำ'],
-    ['/practice', 'target', 'ฝึกฝน'], ['/grammar', 'scroll-text', 'ไวยากรณ์'], ['/stats', 'chart-column', 'สถิติ']
+    ['/practice', 'target', 'ฝึกฝน'], ['/talk', 'mic', 'พูด'], ['/grammar', 'scroll-text', 'ไวยากรณ์'], ['/stats', 'chart-column', 'สถิติ']
   ];
   function navOn(path, href) {
     if (href === '/') return path === '/' || /^\/(level|unit|test|base)/.test(path);
@@ -328,6 +328,9 @@
     [/^\/sounds$/, () => viewSounds()],
     [/^\/practice$/, () => viewPractice()],
     [/^\/practice\/(match|order|dictation|speak|mistakes|stars|placement|tones2|measure|cloze|listens|trad|parts|typing|blitz|reader)$/, m => PRACTICE_VIEWS[m[1]]()],
+    [/^\/talk$/, () => viewTalk()],
+    [/^\/talk\/(drill|dialogues|phrases|shadow)$/, m => ({ drill: viewDrill, dialogues: viewDialogues, phrases: viewPhrases, shadow: viewShadow })[m[1]]()],
+    [/^\/talk\/d\/(\w+)$/, m => viewDialogue(m[1])],
     [/^\/stats$/, () => viewStats()]
   ];
   function route() {
@@ -2118,6 +2121,291 @@
     }
     $$('#rl .chip').forEach(c => c.onclick = () => { lvl = +c.dataset.l; $$('#rl .chip').forEach(x => x.classList.toggle('on', x === c)); if (D) load(); });
     $('#rpy').onchange = e => { S.settings.pinyin = e.target.checked; save(); if (D && i < set.length) show(); };
+    SENT().then(d => { D = d; if (host.isConnected) load(); }).catch(() => { host.innerHTML = '<div class="card empty"><h2>โหลดประโยคไม่สำเร็จ</h2><p>ต้องต่ออินเทอร์เน็ตครั้งแรก แล้วลองใหม่</p></div>'; });
+  }
+
+  /* ---------- พูด: บทสนทนา วลี พูดจากภาษาไทย พูดตามประโยค ---------- */
+  const SPK = window.SPEAK || { phrases: [], dialogues: [] };
+  const RATES = [['ช้า', 0.6], ['ปกติ', 0.85], ['เร็ว', 1.05], ['ธรรมชาติ', 1.2]];
+  function rateChips() {
+    return `<div class="row wrap" style="gap:12px"><span class="muted" style="font-size:14px">ความเร็วเสียง</span><div class="chips" data-rates>${RATES.map(([t, r]) => `<button class="chip ${Math.abs(S.settings.rate - r) < 0.03 ? 'on' : ''}" data-rate="${r}">${t}</button>`).join('')}</div></div>`;
+  }
+  function bindRates(root) {
+    $$('[data-rate]', root).forEach(b => b.onclick = () => { S.settings.rate = +b.dataset.rate; save(); $$('[data-rate]', root).forEach(x => x.classList.toggle('on', x === b)); });
+  }
+  function speakP(text, rate) {
+    return new Promise(res => {
+      if (!hasTTS) { res(); return; }
+      const u = new SpeechSynthesisUtterance(text); u.lang = 'zh-CN'; if (voice) u.voice = voice; u.rate = rate || S.settings.rate;
+      u.onend = u.onerror = () => res(); speechSynthesis.speak(u);
+    });
+  }
+  const hanOnly = s => [...s].filter(c => /\p{Script=Han}/u.test(c)).join('');
+  function similarity(said, target) {
+    const a = [...hanOnly(said)], b = [...hanOnly(target)];
+    if (!b.length) return 0;
+    const dp = Array(b.length + 1).fill(0);
+    for (const x of a) { let prev = 0; for (let j = 1; j <= b.length; j++) { const tmp = dp[j]; dp[j] = x === b[j - 1] ? prev + 1 : Math.max(dp[j], dp[j - 1]); prev = tmp; } }
+    return dp[b.length] / b.length;
+  }
+  const sylTones = p => p.split(/\s+/).filter(x => /[a-zü]/i.test(x)).map(x => toneSeq(x)[0] || 5);
+
+  /* ค่าระดับเสียงจากสัญญาณด้วยออโตคอร์เรเลชัน */
+  function pitchOf(buf, rate) {
+    let rms = 0; for (let i = 0; i < buf.length; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / buf.length); if (rms < 0.012) return null;
+    const minL = Math.floor(rate / 420), maxL = Math.floor(rate / 70);
+    let best = -1, bestL = 0;
+    for (let l = minL; l <= maxL; l++) { let c = 0, n1 = 0, n2 = 0; for (let i = 0; i + l < buf.length; i += 2) { c += buf[i] * buf[i + l]; n1 += buf[i] * buf[i]; n2 += buf[i + l] * buf[i + l]; } const r = c / Math.sqrt(n1 * n2 || 1); if (r > best) { best = r; bestL = l; } }
+    return best > 0.55 ? rate / bestL : null;
+  }
+  const TONE_SHAPE = { 1: [5, 5], 2: [3, 5], 3: [2, 1, 2], 4: [5, 1], 5: [3, 3] };
+  function drawContour(cv, frames, tones) {
+    const w = cv.clientWidth || 600, h = 140, dpr = window.devicePixelRatio || 1;
+    cv.width = w * dpr; cv.height = h * dpr; const g = cv.getContext('2d'); g.scale(dpr, dpr); g.clearRect(0, 0, w, h);
+    const y = v => h - 14 - (v - 1) / 4 * (h - 28);
+    g.strokeStyle = rgbVar('--line'); g.lineWidth = 1;
+    for (let v = 1; v <= 5; v++) { g.beginPath(); g.moveTo(0, y(v)); g.lineTo(w, y(v)); g.stroke(); }
+    if (tones.length) {
+      const seg = w / tones.length; g.strokeStyle = rgbVar('--line-2'); g.lineWidth = 8; g.lineCap = 'round'; g.globalAlpha = 0.18;
+      tones.forEach((t, k) => { const s = TONE_SHAPE[t] || TONE_SHAPE[5]; g.beginPath(); s.forEach((v, j) => { const x = k * seg + seg * (0.15 + 0.7 * j / (s.length - 1)); j ? g.lineTo(x, y(v)) : g.moveTo(x, y(v)); }); g.stroke(); });
+      g.globalAlpha = 1;
+    }
+    const v = frames.filter(f => f.f); if (v.length < 3) return false;
+    const i0 = frames.findIndex(f => f.f), i1 = frames.length - 1 - [...frames].reverse().findIndex(f => f.f);
+    const fs = frames.slice(i0, i1 + 1); const sorted = v.map(f => f.f).sort((a, b) => a - b); const med = sorted[sorted.length >> 1];
+    g.strokeStyle = rgbVar('--accent'); g.lineWidth = 3; g.lineJoin = 'round'; g.beginPath(); let pen = false;
+    fs.forEach((f, k) => { const x = fs.length > 1 ? k / (fs.length - 1) * w : w / 2; if (!f.f) { pen = false; return; } const st = Math.max(-7, Math.min(7, 12 * Math.log2(f.f / med))); const yy = y(3 + st / 3.5); pen ? g.lineTo(x, yy) : g.moveTo(x, yy); pen = true; });
+    g.stroke(); return true;
+  }
+
+  /* กล่องอัดเสียง: ฟังต้นแบบ อัดเสียงตัวเอง ฟังซ้ำ ดูรูปวรรณยุกต์ และให้เบราว์เซอร์ฟังว่าพูดว่าอะไร */
+  function voiceBox(el, item, { onResult } = {}) {
+    const tones = item.tones || sylTones(item.py || '');
+    el.innerHTML = `<div class="vbox">
+      <div class="row wrap" style="justify-content:center;gap:12px">
+        <button class="btn" data-vb="play">${ic('volume-2')}ฟังต้นแบบ</button>
+        <button class="btn red" data-vb="rec">${ic('mic')}<span>อัดเสียงพูดตาม</span></button>
+        <button class="btn" data-vb="me" disabled>${ic('play')}ฟังเสียงตัวเอง</button>
+      </div>
+      <p class="vb-said" aria-live="polite"></p>
+      <canvas class="vb-cv" height="140" aria-label="กราฟระดับเสียง"></canvas>
+      <p class="muted vb-cap">แถบจางคือรูปวรรณยุกต์ที่ควรเป็น เส้นแดงคือระดับเสียงของคุณ ใช้ดูรูปทรงคร่าวๆ สูงต่ำ ขึ้นลง</p></div>`;
+    const cv = $('.vb-cv', el); drawContour(cv, [], tones);
+    let url = null, stream = null, mr = null, ctx = null, raf = 0, rec = null, timer = 0, active = false;
+    const frames = [];
+    const btnRec = $('[data-vb=rec]', el);
+    const stopAll = () => {
+      if (!active) return; active = false; clearTimeout(timer); cancelAnimationFrame(raf);
+      try { mr && mr.state !== 'inactive' && mr.stop(); } catch (e) { /* ignore */ }
+      try { rec && rec.stop(); } catch (e) { /* ignore */ }
+      stream && stream.getTracks().forEach(t => t.stop()); ctx && ctx.close().catch(() => {});
+      btnRec.lastChild.textContent = 'อัดใหม่'; btnRec.classList.remove('live');
+      const ok = drawContour(cv, frames, tones);
+      if (!ok && !SR) $('.vb-said', el).textContent = 'ไม่ได้ยินเสียง ลองพูดดังขึ้นอีกนิด';
+    };
+    cleanups.push(stopAll);
+    $('[data-vb=play]', el).onclick = () => speak(item.zh);
+    $('[data-vb=me]', el).onclick = () => { if (url) new Audio(url).play(); };
+    btnRec.onclick = async () => {
+      if (active) { stopAll(); return; }
+      if (hasTTS) speechSynthesis.cancel();
+      frames.length = 0; $('.vb-said', el).textContent = '';
+      try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
+      catch (e) { $('.vb-said', el).textContent = 'ต้องอนุญาตให้ใช้ไมโครโฟนก่อน (กดรูปกุญแจที่แถบที่อยู่เว็บ)'; return; }
+      active = true; btnRec.lastChild.textContent = 'หยุด'; btnRec.classList.add('live');
+      const chunks = [];
+      try { mr = new MediaRecorder(stream); mr.ondataavailable = e => chunks.push(e.data); mr.onstop = () => { if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(new Blob(chunks, { type: mr.mimeType })); $('[data-vb=me]', el).disabled = false; }; mr.start(); } catch (e) { mr = null; }
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const an = ctx.createAnalyser(); an.fftSize = 2048; ctx.createMediaStreamSource(stream).connect(an);
+      const buf = new Float32Array(an.fftSize); const t0 = performance.now();
+      const loop = () => { an.getFloatTimeDomainData(buf); frames.push({ t: performance.now() - t0, f: pitchOf(buf, ctx.sampleRate) }); if (frames.length % 4 === 0) drawContour(cv, frames, tones); raf = requestAnimationFrame(loop); };
+      loop();
+      const maxMs = Math.min(15000, 2500 + [...hanOnly(item.zh)].length * 600);
+      timer = setTimeout(stopAll, maxMs);
+      if (SR) {
+        rec = new SR(); rec.lang = 'zh-CN'; rec.interimResults = false; rec.maxAlternatives = 3;
+        rec.onresult = e => {
+          const alts = [...e.results[0]].map(a => a.transcript);
+          const best = alts.map(t => [t, similarity(t, item.zh)]).sort((a, b) => b[1] - a[1])[0];
+          const sc = Math.round(best[1] * 100);
+          $('.vb-said', el).innerHTML = `ได้ยินว่า <span class="han" style="font-size:20px">${esc(best[0])}</span> <b class="${sc >= 80 ? 'ok' : 'no'}">ตรง ${sc}%</b>`;
+          S.counters.spoken = (S.counters.spoken || 0) + 1; if (sc >= 80) addXP(2); save();
+          onResult && onResult(sc);
+        };
+        rec.onerror = ev => { if (ev.error !== 'aborted' && ev.error !== 'no-speech') $('.vb-said', el).textContent = 'ระบบฟังเสียงใช้ไม่ได้ตอนนี้ ฟังเสียงตัวเองเทียบกับต้นแบบแทนได้'; };
+        rec.onend = () => setTimeout(stopAll, 400);
+        try { rec.start(); } catch (e) { rec = null; }
+      }
+    };
+  }
+
+  /* หน้ารวม */
+  const spItems = () => {
+    const maxL = Math.max(2, curLevel() + 1);
+    return [...SPK.phrases.map(p => ({ key: p.id, zh: p.zh, py: p.py, th: p.th, src: p.c })),
+      ...SPK.dialogues.filter(d => d.l <= maxL).flatMap(d => d.lines.map((x, k) => ({ key: `${d.id}-${k}`, zh: x.zh, py: x.py, th: x.th, src: d.t })))];
+  };
+  const spDue = () => { const now = Date.now(); return Object.keys(S.sp || {}).filter(k => S.sp[k].d <= now); };
+  function talkHead(title, lead) {
+    return `<div class="page-head"><div><div class="crumb"><a href="#/talk">พูด</a>${ic('chevron-right', 's16')}<span>${title}</span></div><h1>${title}</h1><p class="lead">${lead}</p></div></div>`;
+  }
+  function viewTalk() {
+    S.sp = S.sp || {};
+    const due = spDue().length, seen = Object.keys(S.sp).length;
+    app.innerHTML = `<div class="enter">
+      <div class="page-head"><div><h1>ฝึกพูด</h1><p class="lead">การพูดคล่องมาจากการดึงประโยคออกมาจากปากซ้ำๆ จนเป็นอัตโนมัติ ฝึกวันละ 10 นาทีที่นี่ แล้วหาโอกาสพูดกับคนจริงด้วย</p></div></div>
+      <div style="margin-bottom:24px">${rateChips()}</div>
+      <div class="prac-grid">
+        <a class="card prac" href="#/talk/drill"><span class="prac-ic">${ic('rotate-ccw')}</span><span><b>พูดจากภาษาไทย</b><span>${due ? `ถึงรอบทบทวน ${due} ประโยค` : seen ? `ฝึกไปแล้ว ${seen} ประโยค วันนี้ยังไม่มีรอบทบทวน` : 'เห็นประโยคไทยแล้วพูดเป็นจีนให้ได้ ระบบนัดทบทวนให้อัตโนมัติ'}</span></span></a>
+        <a class="card prac" href="#/talk/dialogues"><span class="prac-ic">${ic('user-round')}</span><span><b>บทสนทนา</b><span>${SPK.dialogues.length} สถานการณ์ ฟังทั้งเรื่อง หรือเล่นเป็นตัวละครหนึ่งแล้วพูดโต้ตอบ</span></span></a>
+        <a class="card prac" href="#/talk/phrases"><span class="prac-ic">${ic('list')}</span><span><b>วลีใช้บ่อย</b><span>${SPK.phrases.length} วลีที่คนจีนพูดทุกวัน จำเป็นก้อนแล้วพูดได้ทันที</span></span></a>
+        <a class="card prac" href="#/talk/shadow"><span class="prac-ic">${ic('audio-lines')}</span><span><b>พูดตามประโยค</b><span>ฟังประโยคจริง อัดเสียงพูดตาม ฟังเทียบ และดูรูปวรรณยุกต์ของตัวเอง</span></span></a>
+      </div>
+      <div class="card pad" style="margin-top:32px"><h3>ฝึกกับคนจริงแบบไม่เสียเงิน</h3>
+        <p class="sec" style="margin-top:8px">หาเพื่อนแลกภาษาที่อยากเรียนภาษาไทย คุยสลับกันฝ่ายละครึ่งเวลา หรือพูดกับตัวเองเป็นภาษาจีนทุกวัน เล่าว่าวันนี้ทำอะไร แล้วอัดเสียงฟังย้อนหลัง</p></div></div>`;
+    bindRates(app);
+  }
+
+  /* พูดจากภาษาไทย */
+  function viewDrill() {
+    S.sp = S.sp || {};
+    const items = spItems(); const byKey = new Map(items.map(x => [x.key, x]));
+    const due = shuffle(spDue().filter(k => byKey.has(k))).map(k => byKey.get(k));
+    const fresh = items.filter(x => !S.sp[x.key]).slice(0, Math.max(0, 10 - due.length)).slice(0, 5);
+    const set = [...due.slice(0, 15), ...fresh];
+    app.innerHTML = `<div class="enter">${talkHead('พูดจากภาษาไทย', 'อ่านประโยคภาษาไทย พูดเป็นภาษาจีนออกเสียงจริงก่อน แล้วค่อยเปิดเฉลย ให้คะแนนตัวเองตามจริง ระบบจะนัดประโยคที่ยังติดกลับมาเร็วขึ้น')}<div id="dr"></div></div>`;
+    const host = $('#dr');
+    if (!set.length) { host.innerHTML = `<div class="card empty"><div class="stamp grey">说</div><h2>วันนี้ครบแล้ว</h2><p>ยังไม่มีประโยคถึงรอบ ลองบทสนทนาหรือพูดตามประโยคต่อ</p><div class="row" style="justify-content:center;margin-top:24px"><a class="btn" href="#/talk">กลับหน้าฝึกพูด</a></div></div>`; return; }
+    let i = 0, good = 0;
+    function show() {
+      if (i === set.length) {
+        S.counters.drills = (S.counters.drills || 0) + 1; save();
+        host.innerHTML = `<div class="card result enter"><div class="stamp">说</div><div class="score">${good}/${set.length}</div><p class="sec" style="margin-top:8px">ประโยคที่พูดได้คล่อง</p><div class="row wrap" style="justify-content:center;margin-top:24px"><a class="btn red lg" href="#/talk/dialogues">ไปเล่นบทสนทนา</a><a class="btn lg" href="#/talk">กลับหน้าฝึกพูด</a></div></div>`; return;
+      }
+      const x = set[i]; const isNew = !S.sp[x.key];
+      host.innerHTML = `<div class="quiz"><div class="q-top"><span class="mono muted" style="font-size:13px">${i + 1} / ${set.length}</span><div class="bar accent"><i style="width:${pct(i, set.length)}%"></i></div><span class="mono muted" style="font-size:13px">${isNew ? 'ใหม่' : 'ทบทวน'}</span></div>
+        <div class="card q-card"><p class="q-ask">${esc(x.src)}</p><p class="th-prompt">${esc(x.th)}</p>
+          <p class="muted" style="text-align:center;font-size:14px">พูดออกเสียงเป็นภาษาจีนก่อน แล้วค่อยเปิดเฉลย</p>
+          <div class="row" style="justify-content:center;margin-top:16px"><button class="btn red lg" id="rv">${ic('eye')}เปิดเฉลย</button></div>
+          <div id="ans" hidden><div class="ans-zh"><span class="han">${esc(x.zh)}</span><span class="py">${esc(x.py)}</span></div><div id="vb"></div>
+            <div class="row wrap" style="justify-content:center;gap:12px;margin-top:16px"><button class="btn" data-g="0">ยังพูดไม่ได้</button><button class="btn" data-g="1">ได้แต่ติดขัด</button><button class="btn red" data-g="2">พูดได้คล่อง</button></div></div></div></div>`;
+      $('#rv', host).onclick = () => { $('#rv', host).hidden = true; $('#ans', host).hidden = false; speak(x.zh); voiceBox($('#vb', host), x); };
+      $$('[data-g]', host).forEach(b => b.onclick = () => {
+        const g = +b.dataset.g; const c = S.sp[x.key] || { b: 0, d: 0 };
+        if (g === 0) { c.b = 0; c.d = Date.now() + 10 * 60e3; set.push(x); }
+        else { c.b = Math.min(8, c.b + g); c.d = Date.now() + INT[c.b] * DAY * 0.95; if (g === 2) good++; addXP(2); }
+        S.sp[x.key] = c; save(); i++; show();
+      });
+    }
+    show();
+  }
+
+  /* บทสนทนา */
+  function viewDialogues() {
+    app.innerHTML = `<div class="enter">${talkHead('บทสนทนา', 'สถานการณ์จริงเรียงจากง่ายไปยาก เลือกเรื่องแล้วฟังทั้งเรื่องก่อน จากนั้นเล่นเป็นตัวละครหนึ่งและพูดบทของตัวเอง')}
+      <div class="dlg-list">${SPK.dialogues.map(d => `<a class="card dlg-item" href="#/talk/d/${d.id}"><span class="tag">${hn(d.l)}</span><b>${esc(d.t)}</b><span class="muted">${esc(d.d)}</span>${(S.dlg || {})[d.id] ? `<span class="mono muted" style="font-size:12px">เล่นแล้ว ${S.dlg[d.id]} ครั้ง</span>` : ''}</a>`).join('')}</div></div>`;
+  }
+  function viewDialogue(id) {
+    const d = SPK.dialogues.find(x => x.id === id); if (!d) { location.hash = '#/talk/dialogues'; return; }
+    let mode = 'listen', showTh = true, showPy = S.settings.pinyin, stopFlag = false;
+    cleanups.push(() => { stopFlag = true; });
+    app.innerHTML = `<div class="enter">${talkHead(d.t, d.d)}
+      <div class="row wrap" style="gap:16px;margin-bottom:24px"><div class="chips" id="md"><button class="chip on" data-m="listen">ฟังทั้งเรื่อง</button><button class="chip" data-m="A">เล่นเป็น A</button><button class="chip" data-m="B">เล่นเป็น B</button></div>
+        <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="dpy" ${showPy ? 'checked' : ''}> พินอิน</label>
+        <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="dth" checked> คำแปล</label></div>
+      <div style="margin-bottom:24px">${rateChips()}</div>
+      <div id="dl" class="chat"></div><div id="dctl" class="row wrap" style="justify-content:center;gap:12px;margin-top:24px"></div></div>`;
+    bindRates(app);
+    const host = $('#dl'), ctl = $('#dctl');
+    const bubble = (x, k, hideZh) => `<div class="bub ${x.r === 'A' ? 'l' : 'r'}" data-k="${k}"><span class="who">${x.r}</span>
+      <div class="bz">${hideZh ? '<span class="muted">พูดบทนี้เป็นภาษาจีน</span>' : `<span class="han">${esc(x.zh)}</span>${showPy ? `<span class="py">${esc(x.py)}</span>` : ''}`}${showTh || hideZh ? `<span class="bt">${esc(x.th)}</span>` : ''}</div>
+      ${hideZh ? '' : `<button class="btn sm icon-only ghost" data-say="${esc(x.zh)}" aria-label="ฟัง">${ic('volume-2', 's16')}</button>`}</div>`;
+    function renderListen() {
+      host.innerHTML = d.lines.map((x, k) => bubble(x, k, false)).join(''); bindSay(host);
+      ctl.innerHTML = `<button class="btn red lg" id="pa">${ic('play')}เล่นทั้งเรื่อง</button>`;
+      $('#pa', ctl).onclick = async () => {
+        stopFlag = false;
+        for (let k = 0; k < d.lines.length && !stopFlag; k++) { const b = $(`[data-k="${k}"]`, host); $$('.bub', host).forEach(x => x.classList.toggle('now', x === b)); b && b.scrollIntoView({ block: 'nearest' }); await speakP(d.lines[k].zh); await new Promise(r => setTimeout(r, 350)); }
+        $$('.bub', host).forEach(x => x.classList.remove('now'));
+      };
+    }
+    function renderRole(me) {
+      let k = 0, scores = [];
+      host.innerHTML = ''; ctl.innerHTML = '';
+      async function step() {
+        if (stopFlag) return;
+        if (k === d.lines.length) {
+          S.dlg = S.dlg || {}; S.dlg[d.id] = (S.dlg[d.id] || 0) + 1; addXP(5); save();
+          const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+          ctl.innerHTML = `<p class="sec" style="width:100%;text-align:center">จบบทสนทนา${avg !== null ? ` ความตรงเฉลี่ย ${avg}%` : ''}</p><button class="btn red lg" id="again">${ic('refresh-cw')}เล่นอีกรอบ</button><a class="btn lg" href="#/talk/dialogues">เรื่องอื่น</a>`;
+          $('#again', ctl).onclick = () => renderRole(me); return;
+        }
+        const x = d.lines[k];
+        if (x.r !== me) {
+          host.insertAdjacentHTML('beforeend', bubble(x, k, false)); bindSay(host.lastElementChild);
+          host.lastElementChild.scrollIntoView({ block: 'nearest' }); await speakP(x.zh); k++; step(); return;
+        }
+        host.insertAdjacentHTML('beforeend', bubble(x, k, true)); const b = host.lastElementChild; b.scrollIntoView({ block: 'nearest' });
+        ctl.innerHTML = `<div id="rvb" style="width:100%"></div><button class="btn" id="hint">${ic('eye')}ดูตัวจีน</button><button class="btn primary" id="nx">บรรทัดต่อไป</button>`;
+        let said = null;
+        voiceBox($('#rvb', ctl), x, { onResult: sc => { said = sc; } });
+        const reveal = () => { b.outerHTML = bubble(x, k, false); bindSay(host.lastElementChild); };
+        $('#hint', ctl).onclick = () => { reveal(); speak(x.zh); };
+        $('#nx', ctl).onclick = () => { if (said !== null) scores.push(said); reveal(); k++; step(); };
+      }
+      step();
+    }
+    const render = () => { stopFlag = true; if (hasTTS) speechSynthesis.cancel(); stopFlag = false; mode === 'listen' ? renderListen() : renderRole(mode); };
+    $$('#md .chip').forEach(c => c.onclick = () => { mode = c.dataset.m; $$('#md .chip').forEach(x => x.classList.toggle('on', x === c)); render(); });
+    $('#dpy').onchange = e => { showPy = e.target.checked; if (mode === 'listen') renderListen(); };
+    $('#dth').onchange = e => { showTh = e.target.checked; if (mode === 'listen') renderListen(); };
+    render();
+  }
+
+  /* วลีใช้บ่อย */
+  function viewPhrases() {
+    const cats = [...new Set(SPK.phrases.map(p => p.c))];
+    let cat = cats[0];
+    app.innerHTML = `<div class="enter">${talkHead('วลีใช้บ่อย', 'วลีสำเร็จรูปที่คนจีนพูดจริง กดฟังแล้วพูดตามทั้งก้อน ไม่ต้องแยกคำ วลีทั้งหมดจะเข้าไปในแบบฝึกพูดจากภาษาไทยด้วย')}
+      <div class="chips" id="pc" style="margin-bottom:24px">${cats.map(c => `<button class="chip ${c === cat ? 'on' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('')}</div>
+      <div style="margin-bottom:24px">${rateChips()}</div><div id="pl" class="phr-list"></div></div>`;
+    bindRates(app);
+    const host = $('#pl');
+    function render() {
+      host.innerHTML = SPK.phrases.filter(p => p.c === cat).map(p => `<div class="card phr"><button class="btn sm icon-only ghost" data-say="${esc(p.zh)}" aria-label="ฟัง">${ic('volume-2', 's16')}</button>
+        <div style="min-width:0"><span class="han">${esc(p.zh)}</span><span class="py">${esc(p.py)}</span><span class="bt">${esc(p.th)}</span></div>
+        <button class="btn sm" data-try="${p.id}">${ic('mic', 's16')}ลองพูด</button><div class="phr-vb" id="v-${p.id}"></div></div>`).join('');
+      bindSay(host);
+      $$('[data-try]', host).forEach(b => b.onclick = () => { const p = SPK.phrases.find(x => x.id === b.dataset.try); voiceBox($(`#v-${p.id}`, host), p); b.hidden = true; });
+    }
+    $$('#pc .chip').forEach(c => c.onclick = () => { cat = c.dataset.c; $$('#pc .chip').forEach(x => x.classList.toggle('on', x === c)); render(); });
+    render();
+  }
+
+  /* พูดตามประโยค */
+  function viewShadow() {
+    const maxL = Math.min(TOP, Math.max(1, curLevel()));
+    app.innerHTML = `<div class="enter">${talkHead('พูดตามประโยค', 'ฟังประโยคจริงหนึ่งรอบ แล้วพูดตามทันทีให้จังหวะและเสียงสูงต่ำเหมือนที่สุด อัดเสียงไว้ฟังเทียบ ยิ่งพูดตามได้เร็วยิ่งลื่น')}
+      <div class="row wrap" style="gap:12px;margin-bottom:16px"><span class="muted" style="font-size:14px">ระดับ</span><div class="chips" id="sl">${LEVELS.map(l => `<button class="chip ${l === maxL ? 'on' : ''}" data-l="${l}">${hn(l)}</button>`).join('')}</div></div>
+      <div style="margin-bottom:24px">${rateChips()}</div><div id="sh"><div class="card empty"><p class="muted">กำลังโหลดประโยค</p></div></div></div>`;
+    bindRates(app);
+    const host = $('#sh'); let D = null, lvl = maxL, set = [], i = 0;
+    function load() { set = pick(D.s.filter(s => s[3] === lvl && [...sZh(s)].length <= 20), 10); i = 0; show(); }
+    function show() {
+      if (i === set.length) {
+        host.innerHTML = `<div class="card result enter"><div class="stamp">跟</div><h2 style="margin-top:24px">ครบ 10 ประโยค</h2><div class="row wrap" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}อีก 10 ประโยค</button><a class="btn lg" href="#/talk">กลับหน้าฝึกพูด</a></div></div>`;
+        $('#again', host).onclick = load; return;
+      }
+      const s = set[i]; const tk = toks(s).filter(t => isHan(t.t[0]));
+      const item = { zh: sZh(s), tones: tk.flatMap(({ t, p }) => { const n = [...t].length, q = toneSeq(p); return Array.from({ length: n }, (_, j) => q.length === n ? q[j] : (q[j] || 5)); }) };
+      host.innerHTML = `<div class="quiz"><div class="q-top"><span class="mono muted" style="font-size:13px">${i + 1} / ${set.length}</span><div class="bar accent"><i style="width:${pct(i, set.length)}%"></i></div><span class="mono muted" style="font-size:13px">${hn(s[3])}</span></div>
+        <div class="card q-card"><div class="sent-q big">${sentHTML(s, { py: true })}</div><p class="tr-line">${esc(s[2])}</p><div id="svb"></div>
+          <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn primary" id="nx">ประโยคต่อไป</button></div></div></div>`;
+      bindTokens($('.sent-q', host)); voiceBox($('#svb', host), item); speak(item.zh);
+      $('#nx', host).onclick = () => { addXP(1); i++; show(); };
+    }
+    $$('#sl .chip').forEach(c => c.onclick = () => { lvl = +c.dataset.l; $$('#sl .chip').forEach(x => x.classList.toggle('on', x === c)); if (D) load(); });
     SENT().then(d => { D = d; if (host.isConnected) load(); }).catch(() => { host.innerHTML = '<div class="card empty"><h2>โหลดประโยคไม่สำเร็จ</h2><p>ต้องต่ออินเทอร์เน็ตครั้งแรก แล้วลองใหม่</p></div>'; });
   }
 
