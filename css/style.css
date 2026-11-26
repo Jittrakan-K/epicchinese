@@ -549,7 +549,7 @@ select { height: 40px; border-radius: var(--radius-pill); border: 0; box-shadow:
   .stats-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); }
   .tone-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   .stroke-grid { grid-template-columns: minmax(0, 1fr); }
-  .lvbar { grid-template-columns: 56px minmax(0, 1fr) 72px; gap: var(--space-sm); }
+  .lvbar { grid-template-columns: 64px minmax(0, 1fr) 72px; gap: var(--space-sm); }
   .node-label { width: 132px; font-size: var(--text-xs); }
   .modal { padding: var(--space-lg) var(--space-md); }
   .toast-host { bottom: 88px; }
