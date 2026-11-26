@@ -166,6 +166,10 @@
     return { type: 'done', level: TOP };
   }
   const curLevel = () => current().level;
+  // แผนวันนี้: จดว่าวันนี้ทำกิจกรรมแต่ละอย่างแล้วหรือยัง เก็บเฉพาะของวันนี้
+  function mark(k) { const d = dkey(); if (!S.daily || S.daily.d !== d) S.daily = { d, k: {} }; if (!S.daily.k[k]) { S.daily.k[k] = 1; save(); } }
+  const marked = k => !!(S.daily && S.daily.d === dkey() && S.daily.k[k]);
+  function curHref() { const c = current(); return c.type === 'unit' ? `#/unit/${c.level}-${c.unit.n}` : c.type === 'base' ? `#/base/${c.key}` : c.type === 'test' ? `#/test/${c.level}` : '#/dict'; }
 
   /* ---------- spaced repetition ---------- */
   function addToSRS(ids) {
@@ -179,6 +183,7 @@
     if (g === 0) { c.b = 1; c.d = Date.now() + 10 * 60e3; }
     else { c.b = Math.min(8, c.b + g); c.d = Date.now() + INT[c.b] * DAY * 0.95; }
     S.srs[id] = c;
+    mark('review');
     save();
   }
   function nextDueText() {
@@ -489,8 +494,21 @@
         <div class="kv"><span>รอทบทวน</span><span>${due} คำ</span></div>
         <div class="kv"><span>คำที่เรียนแล้ว</span><span>${fmt(learnedIds().length)}</span></div>
       </div>
-      ${due ? `<a class="btn" style="width:100%;margin-top:16px" href="#/review">${ic('rotate-ccw')}ทบทวน ${due} คำ</a>` : ''}
-    </div>`;
+    </div>${planCard()}`;
+  }
+  function planCard() {
+    const due = dueIds().length, sd = spDue().length;
+    const items = [
+      ['review', 'ทบทวนคำ', due ? `รอ ${due} คำ` : 'ไม่มีคำค้าง', '#/review', marked('review') || (!due && Object.keys(S.srs).length > 0)],
+      ['drill', 'พูดจากภาษาไทย', sd ? `ถึงรอบ ${sd} ประโยค` : '5 ประโยคใหม่', '#/talk/drill', marked('drill')],
+      ['unit', 'เรียนบทใหม่ 1 บท', 'จากแผนที่', curHref(), marked('unit')],
+      ['ear', 'ฟังและพูดตาม', 'บทสนทนาหรือพูดตามประโยค', '#/talk/dialogues', marked('ear')],
+      ['extra', 'แบบฝึกเสริม', 'เกมหรือแบบฝึกที่ชอบ', '#/practice', marked('extra')]
+    ];
+    const n = items.filter(x => x[4]).length;
+    return `<div class="card pad side-card plan"><div class="row" style="justify-content:space-between;align-items:baseline"><h3>แผนวันนี้</h3><span class="mono muted" style="font-size:13px">${n}/${items.length}</span></div>
+      <ol class="plan-list">${items.map(([k, t, d, h, ok]) => `<li class="${ok ? 'ok' : ''}"><a href="${h}"><span class="plan-ck">${ok ? ic('check', 's16') : ''}</span><span><b>${t}</b><span class="muted">${d}</span></span>${ic('chevron-right', 's16')}</a></li>`).join('')}</ol>
+      ${n === items.length ? '<p class="sec" style="margin-top:12px">ครบแผนวันนี้แล้ว เก่งมาก</p>' : ''}</div>`;
   }
   function levelRow(l, sel) {
     const isBase = l === 0;
@@ -577,6 +595,7 @@
       </section>
       <section class="section">
         <div class="section-head"><h2>วันนี้ของคุณ</h2></div>
+        ${planCard()}
         <div class="bento">
           <div class="fill red b-lead"><span class="fig">${fmt(learned)}</span><span class="ttl">คำที่เรียนแล้ว</span><span class="ln">จากทั้งหมด ${fmt(W.length)} คำ ตั้งแต่ HSK 1 ถึง 9</span></div>
           <div class="fill ink b-streak"><span class="fig">${streak()}</span><span class="ttl">วันติดต่อกัน</span><span class="ln">วันนี้ได้ ${t} จากเป้า ${g} XP</span><span class="bar"><i style="width:${Math.min(100, pct(t, g))}%"></i></span></div>
@@ -895,6 +914,7 @@
           const passed = r.score / r.total >= 0.8;
           const prev = S.units[u.key];
           const first = passed && !(prev && prev.done);
+          if (passed) mark('unit');
           S.units[u.key] = { done: passed || !!(prev && prev.done), best: Math.max(pct(r.score, r.total), prev ? prev.best : 0), at: Date.now() };
           save();
           if (first) { addToSRS(u.words.map(w => w.id)); addXP(20); }
@@ -1531,7 +1551,7 @@
       const t = Date.now() - start;
       const best = !S.matchBest || t < S.matchBest;
       if (best) S.matchBest = t;
-      S.counters.matches++; save(); addXP(5);
+      S.counters.matches++; mark('extra'); save(); addXP(5);
       host.innerHTML = `<div class="card result" style="max-width:560px;margin:0 auto"><div class="stamp">配</div><div class="score">${fmtTime(t)}</div>
         <p class="sec" style="margin-top:8px">${best ? 'สถิติใหม่<br>' : ''}จับผิด ${miss} ครั้ง</p>
         <div class="row" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}เล่นอีกครั้ง</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a></div></div>`;
@@ -1893,7 +1913,7 @@
       if (!qs || qs.length < min) { host.innerHTML = `<div class="card empty"><div class="stamp grey">${glyph}</div><h2>ยังทำแบบฝึกนี้ไม่ได้</h2><p>${emptyMsg || 'เลือกแหล่งคำเป็นระดับที่สูงขึ้นในหน้าฝึกฝน แล้วลองใหม่'}</p><div class="row" style="justify-content:center;margin-top:24px"><a class="btn" href="#/practice">กลับไปหน้าฝึกฝน</a></div></div>`; return; }
       runQuiz(host, qs, {
         label: title, xpEach: 3, onFinish: r => {
-          S.counters[key] = (S.counters[key] || 0) + 1; save();
+          S.counters[key] = (S.counters[key] || 0) + 1; mark(key === 'listens' || key === 'tones2' ? 'ear' : 'extra'); save();
           host.innerHTML = resultHTML(r, { passed: r.score / r.total >= 0.8, glyph, title, actions: `<button class="btn red lg" id="again">${ic('refresh-cw')}ชุดใหม่</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a>` });
           bindSay(host); $('#again', host).onclick = () => route();
         }
@@ -2012,7 +2032,7 @@
     let i = 0, score = 0; const wrong = [];
     function show() {
       if (i === set.length) {
-        S.counters.typing = (S.counters.typing || 0) + 1; save();
+        S.counters.typing = (S.counters.typing || 0) + 1; mark('extra'); save();
         host.innerHTML = resultHTML({ score, total: set.length, wrong }, { passed: score >= 8, glyph: '拼', title: 'พิมพ์พินอิน', actions: `<button class="btn red lg" id="again">${ic('refresh-cw')}ชุดใหม่</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a>` });
         bindSay(host); $('#again', host).onclick = viewTyping; return;
       }
@@ -2078,7 +2098,7 @@
       t.textContent = Math.ceil(left / 1000); $('#bb', host).style.width = pct(left, 60000) + '%';
       if (!left) {
         clearInterval(timer); cur = null;
-        const best = score > (S.blitzBest || 0); if (best) S.blitzBest = score; save();
+        const best = score > (S.blitzBest || 0); if (best) S.blitzBest = score; mark('extra'); save();
         host.innerHTML = `<div class="card result enter"><div class="stamp ${best ? '' : 'grey'}">快</div><div class="score">${score}</div>
           <p class="sec" style="margin-top:8px">${best ? 'สถิติใหม่' : `สถิติดีที่สุด ${S.blitzBest} ข้อ`}, ตอบผิด ${miss} ครั้ง</p>
           <div class="row wrap" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}อีกรอบ</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a></div>
@@ -2103,7 +2123,7 @@
     function load() { set = pick(D.s.filter(s => s[3] === lvl), 10); i = 0; got = 0; show(); }
     function show() {
       if (i === set.length) {
-        S.counters.reads = (S.counters.reads || 0) + set.length; save();
+        S.counters.reads = (S.counters.reads || 0) + set.length; mark('extra'); save();
         host.innerHTML = `<div class="card result enter"><div class="stamp">读</div><div class="score">${got}/${set.length}</div><p class="sec" style="margin-top:8px">ประโยคที่อ่านเข้าใจเอง</p>
           <div class="row wrap" style="justify-content:center;margin-top:24px"><button class="btn red lg" id="again">${ic('refresh-cw')}อีก 10 ประโยค</button><a class="btn lg" href="#/practice">ฝึกอย่างอื่น</a></div></div>`;
         $('#again', host).onclick = load; return;
@@ -2213,7 +2233,7 @@
       frames.length = 0; $('.vb-said', el).textContent = '';
       try { stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }); }
       catch (e) { $('.vb-said', el).textContent = 'ต้องอนุญาตให้ใช้ไมโครโฟนก่อน (กดรูปกุญแจที่แถบที่อยู่เว็บ)'; return; }
-      active = true; btnRec.lastChild.textContent = 'หยุด'; btnRec.classList.add('live');
+      active = true; mark('ear'); btnRec.lastChild.textContent = 'หยุด'; btnRec.classList.add('live');
       const chunks = [];
       try { mr = new MediaRecorder(stream); mr.ondataavailable = e => chunks.push(e.data); mr.onstop = () => { if (url) URL.revokeObjectURL(url); url = URL.createObjectURL(new Blob(chunks, { type: mr.mimeType })); $('[data-vb=me]', el).disabled = false; }; mr.start(); } catch (e) { mr = null; }
       ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -2230,7 +2250,7 @@
           const best = alts.map(t => [t, similarity(t, item.zh)]).sort((a, b) => b[1] - a[1])[0];
           const sc = Math.round(best[1] * 100);
           $('.vb-said', el).innerHTML = `ได้ยินว่า <span class="han" style="font-size:20px">${esc(best[0])}</span> <b class="${sc >= 80 ? 'ok' : 'no'}">ตรง ${sc}%</b>`;
-          S.counters.spoken = (S.counters.spoken || 0) + 1; if (sc >= 80) addXP(2); save();
+          S.counters.spoken = (S.counters.spoken || 0) + 1; mark('ear'); if (sc >= 80) addXP(2); save();
           onResult && onResult(sc);
         };
         rec.onerror = ev => { if (ev.error !== 'aborted' && ev.error !== 'no-speech') $('.vb-said', el).textContent = 'ระบบฟังเสียงใช้ไม่ได้ตอนนี้ ฟังเสียงตัวเองเทียบกับต้นแบบแทนได้'; };
@@ -2280,7 +2300,7 @@
     let i = 0, good = 0;
     function show() {
       if (i === set.length) {
-        S.counters.drills = (S.counters.drills || 0) + 1; save();
+        S.counters.drills = (S.counters.drills || 0) + 1; mark('drill'); save();
         host.innerHTML = `<div class="card result enter"><div class="stamp">说</div><div class="score">${good}/${set.length}</div><p class="sec" style="margin-top:8px">ประโยคที่พูดได้คล่อง</p><div class="row wrap" style="justify-content:center;margin-top:24px"><a class="btn red lg" href="#/talk/dialogues">ไปเล่นบทสนทนา</a><a class="btn lg" href="#/talk">กลับหน้าฝึกพูด</a></div></div>`; return;
       }
       const x = set[i]; const isNew = !S.sp[x.key];
@@ -2325,7 +2345,7 @@
       host.innerHTML = d.lines.map((x, k) => bubble(x, k, false)).join(''); bindSay(host);
       ctl.innerHTML = `<button class="btn red lg" id="pa">${ic('play')}เล่นทั้งเรื่อง</button>`;
       $('#pa', ctl).onclick = async () => {
-        stopFlag = false;
+        stopFlag = false; mark('ear');
         for (let k = 0; k < d.lines.length && !stopFlag; k++) { const b = $(`[data-k="${k}"]`, host); $$('.bub', host).forEach(x => x.classList.toggle('now', x === b)); b && b.scrollIntoView({ block: 'nearest' }); await speakP(d.lines[k].zh); await new Promise(r => setTimeout(r, 350)); }
         $$('.bub', host).forEach(x => x.classList.remove('now'));
       };
@@ -2336,7 +2356,7 @@
       async function step() {
         if (stopFlag) return;
         if (k === d.lines.length) {
-          S.dlg = S.dlg || {}; S.dlg[d.id] = (S.dlg[d.id] || 0) + 1; addXP(5); save();
+          S.dlg = S.dlg || {}; S.dlg[d.id] = (S.dlg[d.id] || 0) + 1; mark('ear'); addXP(5); save();
           const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
           ctl.innerHTML = `<p class="sec" style="width:100%;text-align:center">จบบทสนทนา${avg !== null ? ` ความตรงเฉลี่ย ${avg}%` : ''}</p><button class="btn red lg" id="again">${ic('refresh-cw')}เล่นอีกรอบ</button><a class="btn lg" href="#/talk/dialogues">เรื่องอื่น</a>`;
           $('#again', ctl).onclick = () => renderRole(me); return;
@@ -2403,7 +2423,7 @@
         <div class="card q-card"><div class="sent-q big">${sentHTML(s, { py: true })}</div><p class="tr-line">${esc(s[2])}</p><div id="svb"></div>
           <div class="row" style="justify-content:flex-end;margin-top:16px"><button class="btn primary" id="nx">ประโยคต่อไป</button></div></div></div>`;
       bindTokens($('.sent-q', host)); voiceBox($('#svb', host), item); speak(item.zh);
-      $('#nx', host).onclick = () => { addXP(1); i++; show(); };
+      $('#nx', host).onclick = () => { addXP(1); mark('ear'); i++; show(); };
     }
     $$('#sl .chip').forEach(c => c.onclick = () => { lvl = +c.dataset.l; $$('#sl .chip').forEach(x => x.classList.toggle('on', x === c)); if (D) load(); });
     SENT().then(d => { D = d; if (host.isConnected) load(); }).catch(() => { host.innerHTML = '<div class="card empty"><h2>โหลดประโยคไม่สำเร็จ</h2><p>ต้องต่ออินเทอร์เน็ตครั้งแรก แล้วลองใหม่</p></div>'; });

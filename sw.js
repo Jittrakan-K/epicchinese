@@ -1,5 +1,5 @@
 /* แคชไฟล์ของเว็บไว้ใช้ตอนออฟไลน์ เปลี่ยน VERSION ทุกครั้งที่อัปเดตไฟล์หลัก */
-const VERSION = 'epic-v16';
+const VERSION = 'epic-v17';
 const SHELL = ['./', 'index.html', 'css/style.css', 'css/tokens.css', 'css/base.css', 'js/app.js', 'js/cloud.js', 'js/firebase-config.js', 'js/icons.js', 'js/data-words.js', 'js/data-content.js', 'js/data-grammar2.js', 'js/data-speak.js', 'vendor/hanzi-writer.min.js', 'assets/logo.svg', 'assets/logo-192.png', 'manifest.webmanifest'];
 
 self.addEventListener('install', e => {
